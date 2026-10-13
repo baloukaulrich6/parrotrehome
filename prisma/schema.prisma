@@ -1,0 +1,635 @@
+// ============================================================
+// GREYWING — Prisma schema
+// Models the 11 entities documented in Cahier Fonctionnel p.10
+// Business rules:
+//  - Birds are INDIVIDUALS (not a stock quantity) — Cahier p.04
+//  - Manual, agent-mediated payment workflow (no card capture)
+//  - Status lifecycle: Received → Pending review → Awaiting
+//    instructions → Instructions sent → Payment to verify →
+//    Paid - verified → Ready for fulfillment → Completed
+//    (Canceled / Rejected at any step)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------- Roles & Enums --------------------
+
+enum Role {
+  CLIENT
+  SUPER_ADMIN
+  MANAGER
+  AGENT
+  STOCK_MANAGER
+  AVIAN_PROFESSIONAL
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_EMAIL
+}
+
+enum BirdStatus {
+  AVAILABLE
+  RESERVED
+  UNAVAILABLE
+  SOLD
+}
+
+enum ProductCategory {
+  CAGE
+  PERCH
+  TOY
+  FOOD
+  SUPPLY
+}
+
+enum RequestType {
+  PARROT_PURCHASE
+  ACCESSORY_ORDER
+  AVIAN_CONSULTATION
+}
+
+enum RequestStatus {
+  RECEIVED
+  PENDING_REVIEW
+  AWAITING_INSTRUCTIONS
+  INSTRUCTIONS_SENT
+  PAYMENT_TO_VERIFY
+  PAID_VERIFIED
+  READY_FOR_FULFILLMENT
+  COMPLETED
+  CANCELED
+  REJECTED
+}
+
+enum PaymentInstructionStatus {
+  ACTIVE
+  EXPIRED
+  USED
+  REVOKED
+}
+
+enum AppointmentStatus {
+  REQUESTED
+  CONFIRMED
+  COMPLETED
+  CANCELED
+  RESCHEDULED
+}
+
+enum MessageChannel {
+  EMAIL
+  IN_APP
+  SMS
+}
+
+enum MessageDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ASSIGN
+  TRANSFER
+  STATUS_CHANGE
+  PAYMENT_VERIFY
+  INSTRUCTION_SEND
+  INSTRUCTION_EXPIRE
+  LOGIN
+  LOGIN_FAILED
+  EXPORT
+}
+
+// -------------------- 1. Users / Roles --------------------
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String?
+  phone         String?
+  role          Role           @default(CLIENT)
+  status        UserStatus     @default(PENDING_EMAIL)
+  mfaSecret     String?        // TOTP secret for staff (Cahier p.09)
+  mfaEnabled    Boolean        @default(false)
+  consentAt     DateTime?      // GDPR/consent timestamp
+  emailVerifiedAt DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  lastLoginAt   DateTime?
+
+  // Relations
+  requests              Request[]           @relation("RequestCustomer")
+  assignedRequests      Request[]           @relation("RequestAgent")
+  appointmentsAsClient  Appointment[]       @relation("ApptCustomer")
+  appointmentsAsPro     Appointment[]       @relation("ApptProfessional")
+  auditLogs             AuditLog[]
+  paymentChecks         PaymentCheck[]
+  paymentInstructions   PaymentInstruction[]
+  sentMessages          Message[]           @relation("MessageSender")
+  comments              InternalComment[]
+  chatMessages          ChatMessage[]       // F-28 messages sent by this user
+  proposedActions       PendingAction[]     @relation("PendingActionProposer")  // A-09
+  approvedActions       PendingAction[]     @relation("PendingActionApprover")  // A-09
+  sessionTokens         SessionToken[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model SessionToken {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// -------------------- 2. Birds (individual dossiers) --------------------
+
+model Bird {
+  id              String       @id @default(cuid())
+  species         String
+  commonName      String
+  individualId    String?      // band/ring ID if applicable (A-14)
+  ageYears        Float?
+  sex             String?      // "Male" / "Female" / "Unknown"
+  photos          String       // JSON array of URLs
+  status          BirdStatus   @default(AVAILABLE)
+  location        String?      // city, state
+  priceUsd        Float?
+  shortDescription String?
+  longDescription String?
+  careNotes       String?      // species-specific care FAQ (F-03)
+  // Provenance (A-14): legal origin, breeder, source documents
+  breederName     String?
+  originState     String?
+  sourceDocuments String?      // JSON array of {name, url, uploadedAt}
+  healthDocuments String?      // JSON array — restricted access (A-15)
+  // Reservation (A-16): temporary hold with deadline
+  reservedByRequestId String?
+  reservedUntil   DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  requestItems    RequestItem[]
+
+  @@index([species])
+  @@index([status])
+}
+
+// -------------------- 3. Products / Stock --------------------
+
+model Product {
+  id            String         @id @default(cuid())
+  category      ProductCategory
+  name          String
+  sku           String          @unique
+  description   String?
+  photos        String          // JSON array of URLs
+  dimensions    String?         // "L x W x H (in/cm)"
+  compatibility String?         // species compatibility notes
+  features      String?          // JSON array
+  priceUsd      Float
+  currency      String          @default("USD")
+  stockQty      Int             @default(0)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  requestItems  RequestItem[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+// -------------------- 4. Requests --------------------
+
+model Request {
+  id              String         @id @default(cuid())
+  reference       String         @unique  // human-friendly: REQ-XXXX
+  type            RequestType
+  status          RequestStatus  @default(RECEIVED)
+  customerId      String?        // nullable — guest requests (F-08) allowed
+  agentId         String?
+  // Customer info captured in form (F-21)
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  shippingState   String         // US state — must be in served states list
+  shippingAddress String?
+  experience      String?        // "Beginner" / "Intermediate" / "Expert"
+  habitat         String?        // cage / aviary description
+  preferences     String?        // JSON of misc prefs
+  consentAccepted Boolean        @default(false)
+  // Quote (computed from items)
+  totalQuoteUsd   Float?
+  // Discount tracking (A-23)
+  couponId        String?        // applied coupon, if any
+  discountUsd     Float?        // amount discounted
+  finalTotalUsd   Float?        // totalQuoteUsd - discountUsd
+  // Channel attribution (A-26)
+  channel         String?        // "web" | "mobile" | "referral" | "search" | "direct"
+  referrer        String?        // referrer URL if available
+  // Payment tracking
+  selectedPaymentMethodId String?
+  paymentReference String?       // customer-deposited reference (F-26)
+  // Cancellation / rejection motif
+  cancelReason    String?
+  // Lifecycle timestamps
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  assignedAt      DateTime?
+  instructionsSentAt DateTime?
+  paidAt          DateTime?
+  completedAt     DateTime?
+  canceledAt      DateTime?
+
+  customer        User?          @relation("RequestCustomer", fields: [customerId], references: [id])
+  agent           User?          @relation("RequestAgent", fields: [agentId], references: [id])
+  selectedPaymentMethod PaymentMethod? @relation(fields: [selectedPaymentMethodId], references: [id])
+  coupon          Coupon?        @relation(fields: [couponId], references: [id])
+  items           RequestItem[]
+  paymentInstructions PaymentInstruction[]
+  paymentChecks   PaymentCheck[]
+  appointments    Appointment[]
+  messages        Message[]
+  comments        InternalComment[]
+  chatMessages    ChatMessage[]   // F-28 secure client-agent messaging
+  auditLogs       AuditLog[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([agentId])
+  @@index([createdAt])
+}
+
+model RequestItem {
+  id          String    @id @default(cuid())
+  requestId   String
+  birdId      String?
+  productId   String?
+  quantity    Int       @default(1)
+  quotedPriceUsd Float
+  createdAt   DateTime  @default(now())
+
+  request     Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  bird        Bird?     @relation(fields: [birdId], references: [id])
+  product     Product?  @relation(fields: [productId], references: [id])
+
+  @@index([requestId])
+}
+
+// -------------------- 5. Payment Methods (A-06) --------------------
+
+model PaymentMethod {
+  id                   String   @id @default(cuid())
+  name                 String   // "Bank wire transfer", "Zelle", etc.
+  active               Boolean  @default(true)
+  officialProvider     String   // bank/provider name
+  instructionsTemplate String   // template body — agent fills per-request
+  displayOrder         Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  requests             Request[]
+}
+
+// -------------------- 6. Payment Instructions (A-07) --------------------
+
+model PaymentInstruction {
+  id              String                   @id @default(cuid())
+  requestId       String
+  agentId         String
+  secureLinkHash  String                   @unique
+  body            String                   // agent-composed, official instructions
+  expiryAt        DateTime
+  status          PaymentInstructionStatus @default(ACTIVE)
+  version         Int                      @default(1)
+  createdAt       DateTime                 @default(now())
+  revokedAt       DateTime?
+
+  request         Request                  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  agent           User                     @relation(fields: [agentId], references: [id])
+
+  @@index([requestId])
+  @@index([secureLinkHash])
+  @@index([expiryAt])
+}
+
+// -------------------- 7. Payment Checks (A-08, T-06) --------------------
+
+model PaymentCheck {
+  id          String    @id @default(cuid())
+  requestId   String
+  reference   String?   // customer-supplied reference (F-26)
+  amount      Float
+  verifiedBy  String
+  verifiedAt  DateTime  @default(now())
+  notes       String?   // optional — masked justificatif reference
+
+  request     Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  verifier    User      @relation(fields: [verifiedBy], references: [id])
+
+  @@index([requestId])
+}
+
+// -------------------- 8. Appointments (Avian Advice) --------------------
+
+model Appointment {
+  id              String             @id @default(cuid())
+  requestId       String
+  customerId      String?        // nullable — guest appointment requests (F-08)
+  professionalId  String
+  slotStartUtc    DateTime
+  durationMinutes Int                @default(60)
+  status          AppointmentStatus @default(REQUESTED)
+  subject         String?            // "feeding" / "behavior" / "habitat" / "prevention" (F-15)
+  animalInfo     String?            // JSON: species, age, symptoms, history (F-16)
+  attachmentUrls  String?            // JSON array
+  priceUsd        Float @default(15)
+  // F-20: reschedule support
+  proposedSlotStartUtc DateTime?    // when client/agent proposes a new slot
+  proposedBy           String?     // userId of the proposer
+  proposedAt           DateTime?    // when the proposal was made
+  rescheduleReason     String?      // motif for rescheduling
+  originalSlotStartUtc DateTime?   // keep history of original slot
+  // F-19: secure video link + reminders
+  videoCallToken       String?     // non-guessable token for Jitsi room name
+  videoCallUrl         String?     // full URL: https://meet.jit.si/greywing-{token}
+  remindersSent        String?     // JSON: { "24h": ISO, "1h": ISO } timestamps of sent reminders
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  request         Request            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  customer        User?               @relation("ApptCustomer", fields: [customerId], references: [id])
+  professional    User               @relation("ApptProfessional", fields: [professionalId], references: [id])
+
+  @@index([professionalId])
+  @@index([customerId])
+  @@index([slotStartUtc])
+  @@index([status])
+}
+
+// -------------------- 9. Messages / Emails (F-22, F-24) --------------------
+
+model Message {
+  id              String                @id @default(cuid())
+  requestId       String
+  senderId        String?
+  senderRole      String                // "system" | "agent:NAME" | "no-reply"
+  template        String                // "request-received" | "instructions-ready" | etc.
+  channel         MessageChannel        @default(EMAIL)
+  toAddress       String
+  fromAddress     String
+  subject         String
+  body            String
+  sentAt          DateTime              @default(now())
+  deliveryStatus  MessageDeliveryStatus @default(QUEUED)
+  errorMessage     String?
+
+  request         Request               @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  sender          User?                 @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([requestId])
+  @@index([deliveryStatus])
+}
+
+// -------------------- 10. Internal Comments (A-03) --------------------
+
+model InternalComment {
+  id        String   @id @default(cuid())
+  requestId String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([requestId])
+}
+
+// -------------------- 11. Audit Logs (A-11, immutable) --------------------
+
+model AuditLog {
+  id          String       @id @default(cuid())
+  actorId     String?
+  actorRole   String
+  objectType   String       // "Request" | "Bird" | "Product" | "User" | ...
+  objectId    String
+  action      AuditAction
+  changes     String?       // JSON diff
+  metadata    String?       // JSON freeform
+  timestamp   DateTime     @default(now())
+
+  actor       User?        @relation(fields: [actorId], references: [id])
+
+  request     Request?     @relation(fields: [objectId], references: [id], onDelete: NoAction)
+
+  @@index([actorId])
+  @@index([objectType, objectId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+// -------------------- 12. CMS Content (A-21) --------------------
+
+model CmsPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  body      String   // markdown or HTML
+  isPublished Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model FaqEntry {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  category  String?
+  displayOrder Int   @default(0)
+  isPublished Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// -------------------- 13. Served States (Cahier p.13) --------------------
+
+model ServedState {
+  id        String   @id @default(cuid())
+  code      String   @unique  // "CA", "NY", "TX", ...
+  name      String   // "California"
+  allowsBirdDelivery Boolean @default(true)
+  allowsPickup       Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+// -------------------- 14. Reviews (F-10 + A-24 V2) --------------------
+// Verified reviews: only customers with a COMPLETED request can leave a review.
+// Moderated by staff before being visible publicly.
+
+enum ReviewStatus {
+  PENDING_MODERATION
+  PUBLISHED
+  REJECTED
+}
+
+model Review {
+  id          String       @id @default(cuid())
+  requestId    String       @unique  // 1 review per completed request
+  customerId   String
+  customerName String
+  rating      Int          // 1-5 stars
+  title       String
+  body        String
+  status      ReviewStatus @default(PENDING_MODERATION)
+  moderatorId String?
+  moderatedAt DateTime?
+  moderatorNote String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+  @@index([customerId])
+}
+
+// -------------------- 15. Chat Messages (F-28 V2) --------------------
+// Secure client-agent messaging attached to a dossier.
+// Both customers and staff can post; thread is per-request.
+// All posts are audited.
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  requestId   String
+  senderId    String?  // null for system messages
+  senderRole  String   // "CLIENT" | "AGENT" | "MANAGER" | "SUPER_ADMIN" | "STOCK_MANAGER" | "AVIAN_PROFESSIONAL" | "system"
+  senderName  String   // denormalized for fast display
+  body        String
+  attachments String?  // JSON array of URLs (V2 — file upload deferred)
+  readAt      DateTime? // when staff last read the thread
+  createdAt   DateTime @default(now())
+
+  request     Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  sender      User?    @relation(fields: [senderId], references: [id])
+
+  @@index([requestId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+// -------------------- 16. Coupons (A-23 V2) --------------------
+// Consent-based marketing promotions. Codes apply a discount at checkout.
+// All usage is audited and limited by usageLimit + validUntil.
+
+enum CouponType {
+  PERCENTAGE
+  FLAT_USD
+  FREE_SHIPPING
+}
+
+model Coupon {
+  id          String     @id @default(cuid())
+  code        String     @unique  // uppercase, alphanumeric, no spaces
+  description String?
+  type        CouponType
+  value       Float      // percentage 0-100 OR flat USD amount OR 1 for free shipping
+  active      Boolean    @default(true)
+  validFrom   DateTime   @default(now())
+  validUntil  DateTime?
+  usageLimit  Int?       // null = unlimited
+  usedCount   Int        @default(0)
+  minSubtotalUsd Float?  // optional minimum subtotal
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  requests    Request[]   // requests where this coupon was applied
+
+  @@index([code])
+  @@index([active])
+}
+
+// -------------------- 17. Newsletter subscriptions (A-23 V2) --------------------
+// Consent-based newsletter opt-in. Separate from User so anonymous visitors
+// can also subscribe. Consent timestamp is required by GDPR / privacy rules.
+
+model NewsletterSubscription {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String?
+  source      String    @default("footer")  // where they subscribed
+  consentAt   DateTime  @default(now())
+  active      Boolean   @default(true)
+  unsubscribedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([active])
+}
+
+// -------------------- 18. Pending Actions (A-09 V2) --------------------
+// Double validation for sensitive changes / high financial rights.
+// 2-person approval: first actor proposes, second actor approves or rejects.
+
+enum PendingActionType {
+  PAYMENT_VERIFY_HIGH_VALUE
+  PAYMENT_INSTRUCTION_HIGH_VALUE
+  REQUEST_CANCEL_AFTER_PAID
+  BIRD_DELETE
+}
+
+enum PendingActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model PendingAction {
+  id              String             @id @default(cuid())
+  requestId       String?
+  objectType      String             // "Request" | "Bird" | "PaymentInstruction"
+  objectId        String
+  actionType      PendingActionType
+  proposedById    String
+  proposedByName  String
+  proposedAt      DateTime           @default(now())
+  proposedChanges String             // JSON: the full proposed action payload
+  reason          String?            // why the action is being proposed
+  approverId      String?
+  approverName    String?
+  approvedAt      DateTime?
+  rejectedReason  String?
+  status          PendingActionStatus @default(PENDING)
+  // Threshold that triggered the double validation (e.g., 1000 for $1000)
+  thresholdValue  Float?
+  expiresAt       DateTime           @default(now()) // 24h default
+
+  proposedBy      User?              @relation("PendingActionProposer", fields: [proposedById], references: [id])
+  approver        User?              @relation("PendingActionApprover", fields: [approverId], references: [id])
+
+  @@index([status])
+  @@index([actionType])
+  @@index([proposedById])
+}
