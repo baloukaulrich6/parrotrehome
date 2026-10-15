@@ -120,6 +120,8 @@ export default async function AdminProductsPage({
                             mode="edit"
                             product={{
                               id: p.id,
+                              photos: p.photos ?? "[]",
+                              features: p.features ?? "[]",
                               name: p.name,
                               sku: p.sku,
                               category: p.category,

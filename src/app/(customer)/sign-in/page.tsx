@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import Link from "next/link";
 import { ParrotRehomeLogo } from "@/components/parrotrehome/logo";
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") || "/";
@@ -129,4 +130,8 @@ export default function SignInPage() {
       </div>
     </div>
   );
+}
+
+export default function SignInPage() {
+  return <Suspense fallback={<p className="p-6 text-feather">Loading…</p>}><SignInContent /></Suspense>;
 }

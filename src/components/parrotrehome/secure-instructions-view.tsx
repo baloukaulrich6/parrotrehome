@@ -1,5 +1,6 @@
 "use client";
 
+import { PaymentCountdown, usePaymentCountdown } from "./payment-countdown";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -26,7 +27,8 @@ export function SecureInstructionsView({
   status: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const isExpired = new Date(expiryAt).getTime() < Date.now() || status === "EXPIRED";
+  const remaining = usePaymentCountdown(expiryAt);
+  const isExpired = remaining === 0 || new Date(expiryAt).getTime() <= Date.now() || status === "EXPIRED";
   const isRevoked = status === "REVOKED";
 
   async function copyLink() {
@@ -54,11 +56,12 @@ export function SecureInstructionsView({
         </span>
       </div>
 
-      <div className="bg-ivory border border-feather/20 rounded-lg p-4 my-3">
+      <PaymentCountdown expiryAt={expiryAt} />
+      {!isExpired && !isRevoked && <div className="bg-ivory border border-feather/20 rounded-lg p-4 my-3">
         <pre className="whitespace-pre-wrap font-body text-[13px] text-slate leading-relaxed">
           {body}
         </pre>
-      </div>
+      </div>}
 
       <p className="text-[12px] font-body text-feather flex items-center gap-1 mb-3">
         <Clock className="h-3 w-3" aria-hidden />
@@ -89,8 +92,7 @@ export function SecureInstructionsView({
           <ShieldCheck className="h-4 w-4 text-forest flex-shrink-0 mt-0.5" aria-hidden />
           <p className="text-[12px] font-body text-slate leading-relaxed">
             <strong>Traceable &amp; signed.</strong> This link is personal,
-            non-guessable, and audited. Our agent verified your identity before
-            issuing it. A status of <em>Paid - verified</em> requires the
+            non-guessable, and recorded in your request history. A status of <em>Paid - verified</em> requires the
             agent&apos;s manual confirmation through the official provider —
             never just a click.
           </p>

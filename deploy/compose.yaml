@@ -1,0 +1,50 @@
+name: parrotrehome
+services:
+  init:
+    image: parrotrehome-setup:local
+    build:
+      context: ..
+      target: setup
+    env_file: /etc/parrotrehome/runtime.env
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL required}
+    secrets: [admin_password]
+    volumes: ["data:/data"]
+    restart: "no"
+    profiles: [setup]
+  app:
+    image: parrotrehome-app:local
+    build:
+      context: ..
+      target: runtime
+    env_file: /etc/parrotrehome/runtime.env
+    volumes: ["data:/data"]
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test: [CMD, node, -e, 'fetch("http://127.0.0.1:3000/api/payment-methods").then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))']
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN required}
+      CERT_EMAIL: ${CERT_EMAIL:?CERT_EMAIL required}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  data:
+  caddy_data:
+  caddy_config:
+secrets:
+  admin_password:
+    file: /etc/parrotrehome/admin_password

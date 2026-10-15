@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageUpload } from "./image-upload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,6 +10,8 @@ import { ProductCategory } from "@prisma/client";
 
 interface ProductData {
   id?: string;
+  photos?: string;
+  features?: string;
   name?: string;
   sku?: string;
   category?: ProductCategory;
@@ -32,7 +35,10 @@ export function ProductFormDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
+    photos: product?.photos ?? "[]",
+    features: product?.features ?? "[]",
     name: product?.name ?? "",
     sku: product?.sku ?? "",
     category: (product?.category ?? "SUPPLY") as ProductCategory,
@@ -56,8 +62,8 @@ export function ProductFormDialog({
         ...form,
         priceUsd: Number(form.priceUsd),
         stockQty: Number(form.stockQty),
-        photos: "[]",
-        features: "[]",
+        photos: form.photos,
+        features: form.features,
       };
       const url = mode === "create" ? "/api/admin/products" : `/api/admin/products/${product?.id}`;
       const method = mode === "create" ? "POST" : "PUT";
@@ -141,9 +147,10 @@ export function ProductFormDialog({
             <label className="text-[11px] font-body font-semibold text-feather uppercase tracking-wide">Compatibility</label>
             <input type="text" value={form.compatibility} onChange={(e) => update("compatibility", e.target.value)} placeholder="Species compatibility notes" className="mt-1 w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
           </div>
+          <ImageUpload value={form.photos} onChange={(value) => update("photos", value)} onBusyChange={setUploading} />
           <div className="flex justify-end gap-2 pt-2 border-t border-feather/15">
             <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-md border border-feather/30 hover:bg-feather/10 text-slate text-[13px] font-body font-semibold">Cancel</button>
-            <button type="submit" disabled={submitting} className="h-10 px-4 rounded-md bg-tail-red hover:bg-tail-red-dark text-white text-[13px] font-body font-semibold disabled:bg-feather/40">
+            <button type="submit" disabled={submitting || uploading} className="h-10 px-4 rounded-md bg-tail-red hover:bg-tail-red-dark text-white text-[13px] font-body font-semibold disabled:bg-feather/40">
               {submitting ? "Saving..." : mode === "create" ? "Create product" : "Save changes"}
             </button>
           </div>

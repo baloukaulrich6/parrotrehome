@@ -1,3 +1,4 @@
+import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -48,9 +49,9 @@ export default async function RequestDetailPage({
     include: {
       items: { include: { bird: true, product: true } },
       appointments: { include: { professional: true } },
-      messages: { orderBy: { sentAt: "asc" } },
+      messages: { where: { channel: "EMAIL" }, orderBy: { sentAt: "asc" } },
       paymentInstructions: { orderBy: { createdAt: "desc" } },
-      paymentChecks: { orderBy: { verifiedAt: "desc" } },
+      paymentChecks: { include: { verifier: { select: { name: true } } }, orderBy: { verifiedAt: "desc" } },
       auditLogs: { orderBy: { timestamp: "asc" } },
     },
   });
@@ -87,6 +88,7 @@ export default async function RequestDetailPage({
 
   return (
     <div className="bg-ivory min-h-[60vh]">
+      <LiveRequestRefresh />
       <section className="bg-white border-b border-feather/20 py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Link
@@ -329,8 +331,8 @@ export default async function RequestDetailPage({
             )}
 
             {/* Payment reference deposit — when status = INSTRUCTIONS_SENT or PAYMENT_TO_VERIFY */}
-            {(request.status === "INSTRUCTIONS_SENT" || request.status === "PAYMENT_TO_VERIFY") && (
-              <PaymentReferenceDeposit requestId={request.id} existingReference={request.paymentReference} />
+            {(request.status === "INSTRUCTIONS_SENT" || request.status === "PAYMENT_TO_VERIFY") && activeInstruction && (
+              <PaymentReferenceDeposit expiryAt={activeInstruction.expiryAt} requestId={request.id} existingReference={request.paymentReference} />
             )}
 
             {/* Paid verified — read-only confirmation */}
@@ -370,8 +372,9 @@ export default async function RequestDetailPage({
                   {request.messages.map((m) => (
                     <li key={m.id} className="border-b border-feather/10 pb-2 last:border-0 last:pb-0">
                       <p className="text-slate font-semibold">{m.subject}</p>
+                      <details className="mt-2"><summary className="cursor-pointer text-forest">Read message</summary><p className="whitespace-pre-wrap mt-2 text-slate">{m.body}</p></details>
                       <p className="text-feather">
-                        {m.deliveryStatus === "SENT" ? "✓ Sent" : m.deliveryStatus === "FAILED" ? "✗ Failed" : m.deliveryStatus.toLowerCase()}
+                        {m.deliveryStatus === "SENT" ? "✓ Sent" : m.deliveryStatus === "FAILED" ? "✗ Failed" : m.deliveryStatus === "QUEUED" ? "Demo preview — not sent" : m.deliveryStatus.toLowerCase()}
                         {" · "}
                         {formatDateUTC(m.sentAt)}
                       </p>

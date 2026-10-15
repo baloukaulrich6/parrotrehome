@@ -1,5 +1,7 @@
 # 🦜 ParrotRehome.com
 
+VPS deployment with Docker Compose and automatic HTTPS: see [docs/docker-vps.md](docs/docker-vps.md) and run `scripts/deploy-vps.sh` on the VPS. This deployment preserves uploaded media and SQLite, creates a private initial administrator, and keeps outgoing email in preview mode until a provider is connected.
+
 **US-based parrot e-commerce & avian consultation platform** with manual, agent-verified payment workflow.
 
 ![ParrotRehome](https://img.shields.io/badge/ParrotRehome-v1.8-D54149) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue) ![Prisma](https://img.shields.io/badge/Prisma-6-indigo) ![Tailwind](https://img.shields.io/badge/Tailwind-4-cyan)

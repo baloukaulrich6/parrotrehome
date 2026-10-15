@@ -26,7 +26,6 @@ export async function GET(req: Request) {
       id: true,
       name: true,
       officialProvider: true,
-      instructionsTemplate: true,
     },
   });
   return NextResponse.json({ methods });

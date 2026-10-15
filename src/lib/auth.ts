@@ -118,6 +118,7 @@ export const authOptions: NextAuthOptions = {
 export async function getServerUser(): Promise<{
   id: string;
   email: string;
+  name: string | null;
   role: Role;
   status: string;
 } | null> {
@@ -127,6 +128,7 @@ export async function getServerUser(): Promise<{
   return {
     id: session.user.id,
     email: session.user.email,
+    name: session.user.name ?? null,
     role: session.user.role,
     status: session.user.status,
   };

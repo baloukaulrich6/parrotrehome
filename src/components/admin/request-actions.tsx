@@ -90,7 +90,7 @@ export function CreateInstructionsForm({
       .replace("{{requestReference}}", reference)
       .replace("{{totalQuoteUsd}}", totalUsd.toFixed(2))
   );
-  const [hours, setHours] = useState(48);
+
   const [submitting, setSubmitting] = useState(false);
 
   async function submit() {
@@ -103,11 +103,11 @@ export function CreateInstructionsForm({
       const res = await fetch(`/api/admin/requests/${requestId}/instructions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: body.trim(), expiresHours: hours }),
+        body: JSON.stringify({ body: body.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      toast.success("Secure instructions sent to customer.");
+      toast.success(data.emailStatus === "QUEUED" ? "Instructions created. Demo email saved; no email was sent." : data.emailStatus === "FAILED" ? "Instructions created, but the email failed. Check delivery history." : "Secure instructions sent to customer.");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -130,19 +130,7 @@ export function CreateInstructionsForm({
         rows={8}
         className="w-full px-2 py-2 rounded-md border border-feather/30 bg-white text-[12px] font-body focus-ring"
       />
-      <div className="mt-2 flex items-center gap-2">
-        <label className="text-[11px] font-body font-semibold text-feather">Expiry:</label>
-        <select
-          value={hours}
-          onChange={(e) => setHours(Number(e.target.value))}
-          className="h-8 px-2 rounded-md border border-feather/30 bg-white text-[12px] font-body focus-ring"
-        >
-          <option value={6}>6 hours</option>
-          <option value={24}>24 hours</option>
-          <option value={48}>48 hours</option>
-          <option value={72}>72 hours</option>
-        </select>
-      </div>
+      <p className="mt-2 text-xs text-feather">Valid for 20 minutes from issue. Review and update the payment details for this request before sending.</p>
       <button
         type="button"
         onClick={submit}

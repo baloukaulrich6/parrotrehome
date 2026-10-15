@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { audit } from "@/lib/audit";
+import { photosSchema } from "@/lib/photo-schema";
 import { z } from "zod";
 
 const schema = z.object({
@@ -11,7 +12,7 @@ const schema = z.object({
   individualId: z.string().optional(),
   ageYears: z.number().nullable().optional(),
   sex: z.string().optional(),
-  photos: z.string(),
+  photos: photosSchema,
   status: z.enum(["AVAILABLE", "RESERVED", "UNAVAILABLE", "SOLD"]),
   location: z.string().optional(),
   priceUsd: z.number().nullable().optional(),
