@@ -1,3 +1,4 @@
+import { sendRequestNotification } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -84,6 +85,8 @@ export async function POST(
           data: { status: newStatus, paidAt: new Date() },
         });
       });
+
+      await sendRequestNotification(requestId, "payment-verified", "", `payment-verified:${requestId}`);
 
       await auditLog.paymentVerify(user.id, user.role, requestId, changes.reference as string, changes.amount as number);
       await auditLog.requestStatusChange(user.id, user.role, requestId, request.status, newStatus, { approvedVia: action.id });

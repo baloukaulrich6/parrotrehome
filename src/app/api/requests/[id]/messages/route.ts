@@ -1,3 +1,4 @@
+import { sendRequestNotification } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -142,6 +143,8 @@ export async function POST(
       action: "CREATE",
       metadata: { requestId: id, bodyLength: parsed.data.body.length },
     });
+
+    if (user.role !== "CLIENT") await sendRequestNotification(id, "agent-reply", parsed.data.body, message.id);
 
     return NextResponse.json({
       id: message.id,

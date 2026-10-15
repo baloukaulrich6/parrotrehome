@@ -6,7 +6,7 @@ import { emailVariables, saveEmailTemplate } from "@/lib/email-templates";
 import { audit } from "@/lib/audit";
 
 const schema = z.object({
-  name: z.enum(["request-received", "instructions-ready"]),
+  name: z.enum(["request-received", "instructions-ready", "payment-reminder", "payment-reference-received", "payment-verified", "agent-reply"]),
   subject: z.string().min(3).max(200).regex(/^[^\r\n]+$/),
   body: z.string().trim().min(1).max(10000),
 });
@@ -21,7 +21,7 @@ export async function PUT(req: Request) {
   const { name, subject, body } = parsed.data;
   const variables = [...`${subject}\n${body}`.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]);
   if (variables.some((v) => !emailVariables.includes(v))) return NextResponse.json({ error: "Unknown template variable." }, { status: 400 });
-  if (name === "instructions-ready" && ["secureLink", "expiry", "reference"].some((v) => !body.includes(`{{${v}}}`))) {
+  if ((name === "instructions-ready" || name === "payment-reminder") && ["secureLink", "expiry", "reference"].some((v) => !body.includes(`{{${v}}}`))) {
     return NextResponse.json({ error: "Payment emails must include {{secureLink}}, {{expiry}} and {{reference}}." }, { status: 400 });
   }
   saveEmailTemplate(name, { subject, body });

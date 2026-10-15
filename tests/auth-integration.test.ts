@@ -22,7 +22,7 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
   const port = (socket.address() as { port: number }).port;
   await new Promise<void>((resolve) => socket.close(() => resolve()));
   const base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, DATABASE_URL: `file:${temporary}/app.db`, NEXTAUTH_URL: base, NEXTAUTH_SECRET: "isolated-http-test-only-secret-over-32-chars", NEXT_TELEMETRY_DISABLED: "1", MAIL_TRANSPORT: "preview", SITE_SETTINGS_FILE: path.join(temporary, "site-settings.json") };
+  const env = { ...process.env, DATABASE_URL: `file:${temporary}/app.db`, NEXTAUTH_URL: base, NEXTAUTH_SECRET: "isolated-http-test-only-secret-over-32-chars", NEXT_TELEMETRY_DISABLED: "1", MAIL_TRANSPORT: "preview", CRON_SECRET: "local-mail-cron-fixture-token-32chars", MAIL_REPLY_DOMAIN: "", RESEND_API_KEY: "", EMAIL_INBOX_DIR: path.join(temporary, "email-inbox"), RESEND_WEBHOOK_SECRET: "", EMAIL_TEMPLATES_FILE: path.join(temporary, "email-templates.json"), SITE_SETTINGS_FILE: path.join(temporary, "site-settings.json") };
   const db = new PrismaClient({ datasourceUrl: env.DATABASE_URL });
   const password = "Only-for-local-integration-tests";
   let server: ReturnType<typeof Bun.spawn> | undefined;
@@ -147,6 +147,24 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
     expect(stored.mfaSecret).not.toBe(secret);
     expect(await db.auditLog.count({ where: { actorId: initial.id, action: "LOGIN_FAILED" } })).toBeGreaterThanOrEqual(3);
     expect(await db.auditLog.count({ where: { action: "CREATE", objectType: "User" } })).toBeGreaterThanOrEqual(3);
+    const inboxPage = await admin.request("/admin/inbox");
+    expect(inboxPage.status).toBe(200); expect(await inboxPage.text()).toContain("Support inbox");
+    // Staff messages trigger emails; client messages never email themselves.
+    const dossier = await db.request.create({ data: { reference: "MAIL-TEST-001", type: "PARROT_PURCHASE", shippingState: "CA", status: "INSTRUCTIONS_SENT", customerName: "Mail Client", customerEmail: "client@example.com", totalQuoteUsd: 100 } });
+    await db.paymentInstruction.create({ data: { requestId: dossier.id, agentId: initial.id, secureLinkHash: "local-reminder-token", body: "Fixture instructions", expiryAt: new Date(Date.now() + 180000), status: "ACTIVE" } });
+    expect((await fetch(base + "/api/cron/payment-reminders", { method: "POST" })).status).toBe(401);
+    const runReminders = () => fetch(base + "/api/cron/payment-reminders", { method: "POST", headers: { Authorization: `Bearer ${env.CRON_SECRET}` } });
+    expect((await runReminders()).status).toBe(200);
+    expect((await runReminders()).status).toBe(200);
+    expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-reminder" } })).toBe(1);
+    await db.request.update({ where: { id: dossier.id }, data: { status: "PAYMENT_TO_VERIFY" } });
+    expect((await admin.request(`/api/requests/${dossier.id}/messages`, { body: "We are reviewing your request." }, "POST")).status).toBe(200);
+    expect(await db.message.count({ where: { requestId: dossier.id, template: "agent-reply", deliveryStatus: "QUEUED" } })).toBe(1);
+    expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-verified" } })).toBe(0);
+    expect((await admin.request(`/api/admin/requests/${dossier.id}/verify`, { amount: 100, reference: "VERIFIED-REFERENCE" }, "POST")).status).toBe(200);
+    expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-verified", deliveryStatus: "QUEUED" } })).toBe(1);
+    expect((await runReminders()).status).toBe(200);
+    expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-reminder" } })).toBe(1);
     // A console recovery reset must invalidate previously MFA-verified sessions.
     const reset = Bun.spawn([process.execPath, "run", "scripts/reset-staff-mfa.ts", "--email", initial.email, "--confirm-reset"], { cwd: root, env, stdout: log, stderr: log });
     expect(await reset.exited).toBe(0);

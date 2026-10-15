@@ -32,6 +32,64 @@ Need help? Contact your assigned agent through the messaging section of your req
 Thank you for choosing ParrotRehome.
 The ParrotRehome team`,
   },
+  "payment-reminder": {
+    subject: "Payment instructions expiring soon — Request #{{reference}}",
+    body: `Dear {{customerName}},
+
+We have not yet received a payment confirmation reference for request #{{reference}}. The current CHMK payment instructions expire at {{expiry}}.
+
+If you have already paid, please do not pay again. Submit your payment reference through My Requests so our team can verify it.
+
+If you still wish to proceed, review your current payment instructions here before making a payment:
+{{secureLink}}
+
+If the instructions expire, do not use the old payment details. Contact your agent for new instructions. Your account remains accessible.
+
+Need help? Reply to this email or use your request conversation.
+The ParrotRehome team`,
+  },
+  "payment-reference-received": {
+    subject: "Payment reference received — Request #{{reference}}",
+    body: `Dear {{customerName}},
+
+We have received the payment reference submitted for request #{{reference}}. Our team will verify it with the payment provider.
+
+This is an acknowledgement of your submission, not a confirmation that funds have been received. Please do not send a second payment while verification is in progress.
+
+You can follow your request or contact your agent here:
+{{secureLink}}
+
+We will email you once verification is complete.
+The ParrotRehome team`,
+  },
+  "payment-verified": {
+    subject: "Payment verified — Request #{{reference}}",
+    body: `Dear {{customerName}},
+
+Our team has verified receipt of your payment for request #{{reference}}. Your request is now marked Payment verified.
+
+We are preparing the next steps and will contact you with the applicable collection, delivery or appointment details. This message does not confirm a shipping date.
+
+View your request:
+{{secureLink}}
+
+Thank you for your trust. If you have any questions, reply to this email or contact your agent through your request.
+The ParrotRehome team`,
+  },
+  "agent-reply": {
+    subject: "A message from your agent — Request #{{reference}}",
+    body: `Dear {{customerName}},
+
+Your ParrotRehome team has sent an update about request #{{reference}}:
+
+{{message}}
+
+View the conversation and reply:
+{{secureLink}}
+
+You may also reply to this email. Please keep the request reference in the subject.
+The ParrotRehome team`,
+  },
 } as const;
 export type EditableEmailTemplate = keyof typeof defaultEmailTemplates;
 export type EmailTemplateContent = { subject: string; body: string };

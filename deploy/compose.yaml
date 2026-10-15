@@ -20,6 +20,7 @@ services:
     env_file: /etc/parrotrehome/runtime.env
     environment:
       SITE_SETTINGS_FILE: /data/site-settings.json
+      EMAIL_INBOX_DIR: /data/email-inbox
     volumes: ["data:/data"]
     restart: unless-stopped
     init: true

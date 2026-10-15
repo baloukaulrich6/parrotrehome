@@ -17,8 +17,9 @@ RUN --mount=type=secret,id=build_ca \
     bun run db:generate \
     && python3 -c 'import sqlite3; c=sqlite3.connect("/tmp/parrotrehome-build.db"); c.execute("PRAGMA user_version=0"); c.close()' \
     && bun x prisma db push --skip-generate \
-    && bun test tests/demo-workflow.test.ts tests/image-upload.test.ts tests/deployment-bootstrap.test.ts tests/session-mfa.test.ts \
+    && bun test tests/demo-workflow.test.ts tests/image-upload.test.ts tests/deployment-bootstrap.test.ts tests/session-mfa.test.ts tests/email-transport.test.ts tests/email-signatures.test.ts \
     && python3 tests/test_audit_migration.py \
+    && bun test tests/email-inbox.test.ts \
     && bun test tests/auth-integration.test.ts \
     && bun run build \
     && rm -f /tmp/parrotrehome-build.db

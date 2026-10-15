@@ -1,3 +1,4 @@
+import { sendRequestNotification } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -132,6 +133,8 @@ export async function POST(
       newStatus,
       { verifiedAmount: parsed.data.amount }
     );
+
+    await sendRequestNotification(id, "payment-verified", "", `payment-verified:${id}`);
 
     return NextResponse.json({ ok: true, status: newStatus });
   } catch (err) {

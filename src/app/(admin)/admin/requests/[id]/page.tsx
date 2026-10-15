@@ -482,6 +482,7 @@ export default async function DossierPage({
                     <p className="text-feather">
                       {m.deliveryStatus === "SENT" ? "✓" : "✗"} {m.deliveryStatus} · {m.channel} · {formatDateUTC(m.sentAt)}
                     </p>
+                    <details className="mt-2"><summary className="cursor-pointer text-forest">View message</summary><p className="whitespace-pre-wrap break-words mt-2">{m.body}</p>{m.errorMessage && <p className="text-tail-red mt-2">{m.errorMessage}</p>}</details>
                   </li>
                 ))}
               </ul>

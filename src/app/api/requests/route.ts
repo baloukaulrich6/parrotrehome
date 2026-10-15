@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { sendEmail, buildRequestReceivedEmail } from "@/lib/email";
+import { sendEmail, buildRequestReceivedEmail, notifyOrderTeam } from "@/lib/email";
 import { generateRequestReference } from "@/lib/constants";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -245,6 +245,7 @@ export async function POST(req: Request) {
     });
     emailPayload.requestId = request.id;
     await sendEmail(emailPayload);
+    await notifyOrderTeam(request.id);
 
     // Agent notification (F-24): internal Message row indicating assignment is needed
     await db.message.create({

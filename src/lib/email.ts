@@ -1,30 +1,24 @@
+import { replyAddress } from "./email-signatures";
+import { deliverEmail, mailConfiguration } from "./email-transport";
 import { resolveEmailTemplate } from "./email-templates";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 
 // ============================================================
 // ParrotRehome — Email module
-// Cahier p.06 / F-22 / F-25:
-//   Two email types:
-//     1. NO-REPLY AUTOMATIQUE — request received, summary, next steps
-//     2. MESSAGE AGENT OFFICIEL — secure payment instructions ready
-//   Requirements:
-//     - Domain authenticated (SPF/DKIM/DMARC) — out of scope for sandbox
-//     - Idempotent retry queue
-//     - Audit row per send (recipient, template, channel, timestamp,
-//       success/failure, dossier ID) — see Messages table
-//     - No financial secrets in email body
+// Request acknowledgements, payment instructions, verification notices,
+// agent replies and reminders use one transport and persistent deduplication.
+// Payment verification is a separate staff action, never an email event.
 //
-// In the sandbox, we log to console + DB. In production, swap
-// `deliverEmail()` for Resend/AWS SES call.
+// Preview is the default. Live delivery requires explicit Resend server configuration.
 // ============================================================
 
 export interface EmailPayload {
   requestId: string;
   senderId?: string;
   senderRole: string; // "system" | "no-reply" | "agent:NAME"
-  template: "request-received" | "instructions-ready" | "appointment-received" | "appointment-confirmed" | "status-update" | "appointment-reminder";
+  template: "request-received" | "instructions-ready" | "appointment-received" | "appointment-confirmed" | "status-update" | "appointment-reminder" | "payment-reference-received" | "payment-verified" | "agent-reply" | "payment-reminder" | "staff-order-received";
   toAddress: string;
   fromAddress: string;
   subject: string;
@@ -40,59 +34,43 @@ function idempotencyKey(p: EmailPayload): string {
   return `${p.requestId}:${p.template}:${p.toAddress}:${p.eventId ?? p.body}`;
 }
 
-// In-memory dedupe (per-process) — production should use Redis or DB unique constraint
-const sentKeys = new Set<string>();
-
+// Deterministic database IDs prevent duplicate sends across process restarts.
 export async function sendEmail(payload: EmailPayload): Promise<{ messageId: string; status: "QUEUED" | "SENT" | "FAILED" | "DUPLICATE" }> {
   const key = idempotencyKey(payload);
-  if (sentKeys.has(key)) {
-    return { messageId: "duplicate", status: "DUPLICATE" };
-  }
+  const messageId = `email-${createHash("sha256").update(key).digest("hex")}`;
+  const previous = await db.message.findUnique({ where: { id: messageId } });
+  if (previous) return { messageId: previous.id, status: previous.deliveryStatus === "FAILED" ? "FAILED" : "DUPLICATE" };
+  const message = await db.message.create({ data: {
+    id: messageId, requestId: payload.requestId, senderId: payload.senderId ?? null,
+    senderRole: payload.senderRole, template: payload.template, channel: "EMAIL",
+    toAddress: payload.toAddress, fromAddress: mailConfiguration().from,
+    subject: payload.subject, body: payload.body, deliveryStatus: "QUEUED",
+  } }).catch(async error => {
+    if (error.code === "P2002") return null;
+    throw error;
+  });
+  if (!message) return { messageId, status: "DUPLICATE" };
 
   let status: "QUEUED" | "SENT" | "FAILED" = "QUEUED";
   let errorMessage: string | undefined;
 
   try {
-    await deliverEmail(payload);
+    status = await deliverEmail({ ...payload, replyTo: payload.template === "staff-order-received" ? undefined : replyAddress("request", payload.requestId) }, key);
 
   } catch (err) {
     status = "FAILED";
     errorMessage = err instanceof Error ? err.message : String(err);
   }
 
-  const message = await db.message.create({
-    data: {
-      requestId: payload.requestId,
-      senderId: payload.senderId ?? null,
-      senderRole: payload.senderRole,
-      template: payload.template,
-      channel: "EMAIL",
-      toAddress: payload.toAddress,
-      fromAddress: payload.fromAddress,
-      subject: payload.subject,
-      body: payload.body,
-      deliveryStatus: status,
-      errorMessage,
-    },
-  });
-
-  if (status !== "FAILED") sentKeys.add(key);
+  await db.message.update({ where: { id: message.id }, data: { deliveryStatus: status, errorMessage } });
 
   if (status === "FAILED") {
     console.error(`[email] FAILED to send '${payload.template}' (req=${payload.requestId}):`, errorMessage);
   } else {
-    console.log(`[email] PREVIEW '${payload.template}' (req=${payload.requestId})`);
+    console.log(`[email] ${status} '${payload.template}' (req=${payload.requestId})`);
   }
 
   return { messageId: message.id, status };
-}
-
-// Demonstration transport: save only the message in the database below.
-// Never report a preview as SENT, and never transmit client data during a demo.
-async function deliverEmail(_p: EmailPayload): Promise<void> {
-  if (process.env.MAIL_TRANSPORT && process.env.MAIL_TRANSPORT !== "preview") {
-    throw new Error("Live email delivery is not configured. Set MAIL_TRANSPORT=preview for the demo.");
-  }
 }
 
 // ============================================================
@@ -129,7 +107,7 @@ Important: ParrotRehome never collects payment information on-site. One of our a
 Thank you for choosing responsible avian companionship.
 
 — ParrotRehome Team
-(Do not reply to this automated message.)`;
+You can reply to this email to contact our support team. Keep your request reference in the subject.`;
   return {
     requestId: "", // filled by caller
     senderRole: "no-reply",
@@ -380,4 +358,48 @@ export function generateVideoCallToken(): string {
 export function buildVideoCallUrl(token: string): string {
   const base = process.env.JITSI_BASE_URL ?? "https://meet.jit.si";
   return `${base}/parrotrehome-${token}`;
+}
+
+export async function sendRequestNotification(requestId: string, template: "payment-reference-received" | "payment-verified" | "agent-reply", message = "", eventId?: string) {
+  const request = await db.request.findUniqueOrThrow({ where: { id: requestId } });
+  const check = template === "payment-verified" ? await db.paymentCheck.findFirst({ where: { requestId }, orderBy: { verifiedAt: "desc" } }) : null;
+  const amount = template === "payment-verified" ? check?.amount : request.finalTotalUsd ?? request.totalQuoteUsd;
+  return sendEmail({ requestId, senderRole: "system", template,
+    toAddress: request.customerEmail, fromAddress: mailConfiguration().from,
+    eventId: eventId || `${template}:${request.updatedAt.toISOString()}`,
+    ...resolveEmailTemplate(template, { customerName: request.customerName, reference: request.reference,
+      amount: amount == null ? "See your request" : `$${amount.toFixed(2)} USD`,
+      message, secureLink: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/my-requests`,
+    }),
+  });
+}
+
+export async function sendPaymentReminders(now = new Date()) {
+  const instructions = await db.paymentInstruction.findMany({
+    where: { status: "ACTIVE", expiryAt: { gt: now, lte: new Date(now.getTime() + 5 * 60000) }, request: { status: "INSTRUCTIONS_SENT" } },
+    include: { request: true }, take: 100, orderBy: { expiryAt: "asc" },
+  });
+  let sent = 0;
+  for (const instruction of instructions) {
+    const request = instruction.request;
+    const result = await sendEmail({ requestId: request.id, template: "payment-reminder", senderRole: "system", toAddress: request.customerEmail, fromAddress: mailConfiguration().from, eventId: instruction.id,
+      ...resolveEmailTemplate("payment-reminder", { customerName: request.customerName, reference: request.reference, expiry: instruction.expiryAt.toISOString(), secureLink: buildSecureInstructionsLink(process.env.NEXTAUTH_URL || "http://localhost:3000", instruction.secureLinkHash) }),
+    });
+    if (result.status === "SENT") sent++;
+  }
+  return { examined: instructions.length, acceptedByProvider: sent };
+}
+export async function notifyOrderTeam(requestId: string) {
+  const to = process.env.MAIL_ORDER_NOTIFY;
+  if (!to) return;
+  const request = await db.request.findUniqueOrThrow({ where: { id: requestId } });
+  return sendEmail({ requestId, template: "staff-order-received", senderRole: "system", toAddress: to, fromAddress: mailConfiguration().from, eventId: requestId,
+    subject: `New request #${request.reference} — review required`,
+    body: `A new request from ${request.customerName} is ready for review.
+
+Open the administration to review the items and prepare CHMK payment instructions:
+${process.env.NEXTAUTH_URL || "http://localhost:3000"}/admin/requests/${requestId}
+
+No payment has been confirmed.`,
+  });
 }

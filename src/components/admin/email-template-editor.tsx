@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { EditableEmailTemplate } from "@/lib/email-templates";
 import { renderEmailHtml } from "@/lib/email-design";
 
 export function EmailTemplateEditor({ name, initial, canEdit }: {
-  name: "request-received" | "instructions-ready"; initial: { subject: string; body: string }; canEdit: boolean;
+  name: EditableEmailTemplate; initial: { subject: string; body: string }; canEdit: boolean;
 }) {
   const [subject, setSubject] = useState(initial.subject);
   const [body, setBody] = useState(initial.body);
@@ -14,6 +15,7 @@ export function EmailTemplateEditor({ name, initial, canEdit }: {
     agentName: "Your ParrotRehome agent", amount: "$250.00 USD", expiry: "20 minutes after issue (UTC)",
     secureLink: "https://example.com/demo-payment", message: "Dear Alex,\n\nWe have received your request #DEMO-001. Our team will review availability and contact you with the next steps. No payment is confirmed yet.\n\nThank you,\nThe ParrotRehome team",
   };
+  if (name === "agent-reply") variables.message = "We have reviewed your request. Please confirm your preferred collection date so we can prepare the next steps.";
   const substitute = (text: string) => text.replace(/\{\{(\w+)\}\}/g, (_, key: string) => variables[key] || "");
   async function save() {
     setSaving(true);
@@ -26,7 +28,7 @@ export function EmailTemplateEditor({ name, initial, canEdit }: {
     finally { setSaving(false); }
   }
   return <section className="bg-white rounded-xl border border-feather/20 p-5 space-y-3">
-    <h2 className="font-heading text-xl text-slate">{name === "instructions-ready" ? "Payment instructions" : "Request received"}</h2>
+    <h2 className="font-heading text-xl text-slate">{({ "request-received": "Request received", "instructions-ready": "Payment instructions", "payment-reminder": "Payment reminder before expiry", "payment-reference-received": "Payment reference received — awaiting verification", "payment-verified": "Payment verified", "agent-reply": "Agent reply" })[name]}</h2>
     <label className="block text-sm">Subject<input value={subject} disabled={!canEdit} onChange={(e) => setSubject(e.target.value)} className="block w-full border rounded-md p-2 mt-1" /></label>
     <label className="block text-sm">Message<textarea value={body} disabled={!canEdit} onChange={(e) => setBody(e.target.value)} rows={12} className="block w-full border rounded-md p-2 mt-1" /></label>
     <p className="text-xs text-feather">Variables: {Object.keys(variables).map((key) => `{{${key}}}`).join(", ")}</p>

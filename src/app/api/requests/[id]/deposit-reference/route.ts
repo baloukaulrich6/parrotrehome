@@ -1,3 +1,4 @@
+import { sendRequestNotification } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -107,6 +108,8 @@ export async function POST(
         deliveryStatus: "SENT",
       },
     });
+
+    await sendRequestNotification(id, "payment-reference-received");
 
     return NextResponse.json({ ok: true, status: newStatus });
   } catch (err) {

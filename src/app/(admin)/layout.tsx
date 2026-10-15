@@ -36,6 +36,7 @@ const NAV = [
   { href: "/admin/appointments", label: "Appointments", icon: CalendarClock },
   { href: "/admin/payment-methods", label: "Payment methods", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
+  { href: "/admin/inbox", label: "Support inbox", icon: Mail },
   { href: "/admin/settings", label: "Configuration", icon: Settings },
   { href: "/admin/email-templates", label: "Customer emails", icon: Mail },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail },
@@ -54,7 +55,7 @@ export default async function AdminLayout({
 }) {
   const user = await requireStaffPage();
 
-  const visibleNav = NAV.filter(item => item.href !== "/admin/settings" || user.role === "SUPER_ADMIN");
+  const visibleNav = NAV.filter(item => (item.href !== "/admin/settings" || user.role === "SUPER_ADMIN") && (item.href !== "/admin/inbox" || ["SUPER_ADMIN", "MANAGER"].includes(user.role)));
 
   // Fetch full user record for MFA flag (getServerUser doesn't return it)
   const userFull = await db.user.findUnique({
