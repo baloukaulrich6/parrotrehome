@@ -50,7 +50,7 @@ bash scripts/demo.sh
 
 ## Vérifications effectuées
 
-- Quinze tests unitaires et de bootstrap passent : `bun test tests/demo-workflow.test.ts tests/image-upload.test.ts tests/deployment-bootstrap.test.ts tests/session-mfa.test.ts`.
+- Quinze tests unitaires et de bootstrap passent : `bun test tests/demo-workflow.test.ts tests/image-upload.test.ts tests/deployment-bootstrap.test.ts tests/session-policy.test.ts`.
 - Les tests unitaires de route utilisent une identité simulée et un stockage temporaire. Ils couvrent les permissions, les limites de taille, la conversion et la lecture des images.
 - Un parcours HTTP a aussi été exécuté avec les vrais comptes et la base SQLite dédiée : connexion administrateur/client, pages publiques et administration, upload enregistré, création/édition d’un produit avec conservation de la photo dans le catalogue, instructions de 20 minutes, mail conservé avec `QUEUED`, nouvelle version, ancien lien révoqué et référence refusée après expiration (HTTP 410).
 - La modification d’un moyen de paiement est visible dans l’API client ; ses modèles d’instructions restent privés. La sauvegarde du modèle mail depuis l’administration a également été vérifiée.
@@ -62,4 +62,4 @@ bash scripts/demo.sh
 
 L’instance cloud conserve un produit fictif avec photo et un dossier `DEMO-SMOKE-*` pour examiner le parcours. Les comptes de démonstration du README utilisent tous le mot de passe `parrotrehome123` ; ils ne doivent jamais être conservés sur une application publique.
 
-Les corrections Staff/MFA et la migration du journal sont détaillées dans [staff-mfa.md](staff-mfa.md). Le test HTTP isolé `bun test tests/auth-integration.test.ts` vérifie les vraies connexions et les permissions ; `python3 tests/test_audit_migration.py` vérifie la conservation des événements lors de la migration.
+Les corrections Staff et la migration du journal sont détaillées dans [staff-accounts.md](staff-accounts.md). Le test HTTP isolé `bun test tests/auth-integration.test.ts` vérifie les vraies connexions et les permissions ; `python3 tests/test_audit_migration.py` vérifie la conservation des événements lors de la migration.

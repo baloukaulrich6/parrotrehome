@@ -5,7 +5,7 @@ import { accountSchema, canManageAccount } from "@/lib/user-management";
 
 export async function POST(req: Request) {
   const user = await getServerUser();
-  if (!user) return NextResponse.json({ error: "Sign in with MFA required." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   if (user.role !== "SUPER_ADMIN" && user.role !== "MANAGER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (req.headers.get("origin") !== new URL(process.env.NEXTAUTH_URL || req.url).origin) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   const parsed = accountSchema.safeParse(await req.json());

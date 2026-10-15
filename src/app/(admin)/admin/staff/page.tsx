@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { formatDateUTC } from "@/lib/constants";
-import { ShieldCheck, ShieldAlert, Search } from "lucide-react";
+import { ShieldAlert, Search } from "lucide-react";
 
 export const metadata = { title: "Staff — Admin" };
 
@@ -51,7 +51,7 @@ export default async function AdminStaffPage({
   const staff = await db.user.findMany({
     where,
     orderBy: [{ role: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, email: true, role: true, status: true, mfaEnabled: true, lastLoginAt: true },
+    select: { id: true, name: true, email: true, role: true, status: true, lastLoginAt: true },
   });
 
   return (
@@ -63,7 +63,7 @@ export default async function AdminStaffPage({
           Staff directory
         </h1>
         <p className="text-feather text-[14px] font-body mt-1">
-          {staff.length} staff member{staff.length !== 1 ? "s" : ""} · Authenticator required for administrative access
+          {staff.length} staff member{staff.length !== 1 ? "s" : ""}
         </p>
       </div>
 
@@ -101,7 +101,6 @@ export default async function AdminStaffPage({
                 <th className="text-left px-4 py-3 font-semibold">Name</th>
                 <th className="text-left px-4 py-3 font-semibold">Email</th>
                 <th className="text-left px-4 py-3 font-semibold">Role</th>
-                <th className="text-left px-4 py-3 font-semibold">MFA</th>
                 <th className="text-left px-4 py-3 font-semibold">Status</th>
                 <th className="text-left px-4 py-3 font-semibold">Last sign-in (UTC)</th>
                 <th className="text-left px-4 py-3 font-semibold">Actions</th>
@@ -118,17 +117,6 @@ export default async function AdminStaffPage({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {s.mfaEnabled ? (
-                      <span className="inline-flex items-center gap-1 text-forest text-[12px] font-body font-semibold">
-                        <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Enabled
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-tail-red text-[12px] font-body font-semibold">
-                        <ShieldAlert className="h-3.5 w-3.5" aria-hidden /> Required
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
                     <span className={`inline-block h-2 w-2 rounded-full ${s.status === "ACTIVE" ? "bg-forest" : "bg-tail-red"}`} />
                     <span className="ml-2 text-slate text-[12px]">{s.status.replace(/_/g, " ").toLowerCase()}</span>
                   </td>
@@ -143,10 +131,7 @@ export default async function AdminStaffPage({
         </div>
       </div>
 
-      <div className="bg-tail-red/5 border border-tail-red/20 rounded-xl p-4 text-[13px] font-body text-slate">
-        <strong>Security note:</strong> Staff must enable MFA via the
-        &ldquo;Set up MFA&rdquo; button in My account. A pending account can access only MFA setup until enrollment is complete.
-      </div>
+
     </div>
   );
 }

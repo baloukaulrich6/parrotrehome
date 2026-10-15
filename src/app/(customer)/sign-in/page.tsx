@@ -16,7 +16,6 @@ function SignInContent() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [totp, setTotp] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,18 +26,14 @@ function SignInContent() {
       const res = await signIn("credentials", {
         email,
         password,
-        totp,
         redirect: false,
       });
       if (!res || res.error) {
-        toast.error("Check your email, password and authenticator code. If a code was just used, wait for the next one.");
+        toast.error("Check your email and password.");
         return;
       }
       toast.success("Signed in.");
       const session = await getSession();
-      if (session?.user?.role && session.user.role !== "CLIENT" && !session.user.mfaKeyId) {
-        router.push("/staff-mfa"); router.refresh(); return;
-      }
       const fallback = session?.user?.role === "CLIENT" ? "/my-requests" : "/admin";
       const destination = new URL(callbackUrl || fallback, window.location.origin);
       router.push(destination.origin === window.location.origin ? destination.pathname + destination.search : fallback);
@@ -105,9 +100,6 @@ function SignInContent() {
                 </button>
               </div>
             </div>
-            <label className="block text-sm text-feather">Authenticator code (if enabled)
-              <input value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, ""))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit code" className="block w-full h-11 px-3 mt-1 border border-feather/30 rounded-md bg-ivory text-slate tracking-widest" />
-            </label>
             <button
               type="submit"
               disabled={submitting}

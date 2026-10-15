@@ -24,7 +24,7 @@ export function StaffAccountForm({ managerOnly = false, account }: { managerOnly
           const response = await fetch(account ? `/api/admin/users/${account.id}` : "/api/admin/users", { method: account ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(account ? { name, role, status } : { name, email, password, role }) });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || "Could not save the account");
-          toast.success(account ? "Account updated." : role === "CLIENT" ? "Client created. Find them under Customers." : "Staff account created. MFA setup is required on first sign-in.");
+          toast.success(account ? "Account updated." : role === "CLIENT" ? "Client created. Find them under Customers." : "Staff account created. They can sign in with their email and password.");
           setPassword(""); setOpen(false); router.refresh();
         } catch (error) { toast.error(error instanceof Error ? error.message : "Save failed"); }
         finally { setBusy(false); }

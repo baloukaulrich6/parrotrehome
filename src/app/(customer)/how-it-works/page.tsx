@@ -131,7 +131,7 @@ export default async function HowItWorksPage() {
                   Our security commitment
                 </h2>
                 <ul className="text-ivory/85 text-[14px] font-body leading-relaxed space-y-2">
-                  <li>• Passwords hashed with bcrypt; staff MFA; server-side role checks.</li>
+                  <li>• Passwords hashed with bcrypt; expiring sessions; server-side role checks.</li>
                   <li>• Secure payment links: non-guessable, expiring, signed, audited.</li>
                   <li>• No financial secrets transmitted in email — only references you choose to deposit.</li>
                   <li>• A status of <em>Paid - verified</em> always requires an agent&apos;s manual confirmation, never just a customer click.</li>

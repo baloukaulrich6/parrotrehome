@@ -10,7 +10,7 @@
 - Une relance peut partir dans les cinq dernières minutes de validité des instructions, si le planificateur décrit ci-dessous est activé. Elle ne part pas pour un dossier déjà en vérification ou payé. Elle demande de ne pas payer deux fois et de ne pas utiliser des instructions expirées. Une seule relance par version des instructions est enregistrée.
 - Les réponses reçues par email apparaissent dans **Support inbox** (`/admin/inbox`). Les réponses à l’adresse signée d’une commande rejoignent aussi sa conversation si l’expéditeur correspond à l’email client. Un sujet contenant une référence ne suffit pas à rattacher un message.
 
-La boîte globale est accessible aux super administrateurs et managers, avec MFA. Les agents peuvent continuer les conversations des dossiers via l’interface existante. Les adresses d’expéditeur d’emails ne prouvent pas l’identité d’une personne et ne donnent aucun droit supplémentaire. Les emails entrants ne modifient jamais les paiements ou statuts des commandes.
+La boîte globale est accessible aux super administrateurs et managers. La connexion utilise l’email et le mot de passe. Les agents peuvent continuer les conversations des dossiers via l’interface existante. Les adresses d’expéditeur d’emails ne prouvent pas l’identité d’une personne et ne donnent aucun droit supplémentaire. Les emails entrants ne modifient jamais les paiements ou statuts des commandes.
 
 ## Activation sur le VPS
 

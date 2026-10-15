@@ -43,16 +43,16 @@ VPS deployment with Docker Compose and automatic HTTPS: see [docs/docker-vps.md]
 - 📅 Appointments management with reschedule confirm/reject
 - 🎟️ Coupons (percentage / flat USD / free shipping, usage limits, expiry)
 - 📧 Newsletter subscribers (GDPR-compliant consent)
-- 👥 Staff directory with MFA status
+- 👥 Staff directory and account management
 - ⭐ Reviews moderation (publish/reject)
 - 📝 CMS pages + FAQ CRUD
 - 📈 Metrics with channel analytics + periodic CSV reports
-- 🔒 MFA TOTP for staff (RFC 6238)
+- 🔒 Email and password sign-in for staff
 - 📋 Audit log (immutable)
 - 🔔 Pending approvals queue (2-person rule)
 
 ### Security
-- 🔐 NextAuth v4 with JWT, bcrypt password hashing, MFA TOTP for staff
+- 🔐 NextAuth v4 with JWT, bcrypt password hashing, password authentication for staff
 - 🛡️ Rate limiting on 7 endpoints (sign-in, sign-up, coupons, newsletter, contact, requests, appointments)
 - 🚫 Price manipulation protection (server-side price verification, never trusts client-provided prices)
 - 🛡️ Security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy)
@@ -69,7 +69,7 @@ VPS deployment with Docker Compose and automatic HTTPS: see [docs/docker-vps.md]
 | Framework | Next.js 16 (App Router) + React 19 + TypeScript 5 |
 | Styling | Tailwind CSS 4 + shadcn/ui (New York) |
 | Database | Prisma ORM + SQLite (dev) / PostgreSQL (prod) |
-| Auth | NextAuth.js v4 + bcryptjs + otplib (MFA TOTP) |
+| Auth | NextAuth.js v4 + bcryptjs |
 | Email | Idempotent in-process queue (Resend-ready adapter) |
 | Video | Jitsi Meet (self-hostable via `JITSI_BASE_URL`) |
 | Analytics | Google Analytics 4 + Google Ads conversion tracking |
@@ -102,7 +102,7 @@ All passwords: `parrotrehome123`
 
 | Email | Role |
 |-------|------|
-| admin@parrotrehome.com | Super Admin (MFA enabled) |
+| admin@parrotrehome.com | Super Admin (password authentication enabled) |
 | manager@parrotrehome.com | Manager |
 | agent@parrotrehome.com | Agent |
 | stock@parrotrehome.com | Stock Manager |
@@ -153,7 +153,7 @@ src/
 │  ├─ db.ts                  # Prisma client
 │  ├─ email.ts               # Templates + sendEmail + secure links
 │  ├─ audit.ts               # Immutable audit writer
-│  ├─ mfa.ts                 # TOTP helpers
+│  ├─ session-policy.ts      # Session status and expiry checks
 │  ├─ rate-limit.ts          # In-memory rate limiter
 │  ├─ cart-store.ts          # Zustand cart
 │  ├─ favorites-store.ts     # Zustand favorites
@@ -170,7 +170,7 @@ src/
 - RBAC on all admin APIs
 - IDOR protection on all customer APIs
 - Immutable audit log
-- MFA TOTP for staff
+- password authentication for staff
 - Security headers on all responses
 - Content-Security-Policy ready for production
 

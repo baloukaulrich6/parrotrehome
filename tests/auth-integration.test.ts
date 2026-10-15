@@ -8,9 +8,8 @@ import { createServer } from "node:net";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { defaultSiteSettings } from "../src/lib/site-settings-schema";
-import { generateCurrentTotp, generateMfaSecret, verifyMfaToken } from "../src/lib/mfa";
 
-test("real sign-in, MFA enrollment/enforcement, staff management and activity history", async () => {
+test("password-only sign-in, legacy accounts, staff management and activity history", async () => {
   const root = process.cwd();
   const temporary = mkdtempSync(path.join(tmpdir(), "parrot-auth-integration-"));
   const checkout = path.join(temporary, "checkout");
@@ -51,23 +50,11 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
     }
     async session() { return (await this.request("/api/auth/session")).json(); }
   }
-  async function login(email: string, token = "", pwd = password) {
+  async function login(email: string, pwd = password) {
     const client = new Client();
     const { csrfToken } = await (await client.request("/api/auth/csrf")).json();
-    await client.request("/api/auth/callback/credentials", new URLSearchParams({ csrfToken, email, password: pwd, totp: token, json: "true", callbackUrl: base }), "POST");
+    await client.request("/api/auth/callback/credentials", new URLSearchParams({ csrfToken, email, password: pwd, json: "true", callbackUrl: base }), "POST");
     return client;
-  }
-  async function enroll(client: Client) {
-    const init = await client.request("/api/mfa", { action: "init" }, "POST");
-    expect(init.status).toBe(200);
-    const { secret } = await init.json();
-    const code = await generateCurrentTotp(secret);
-    let wrong = "000000";
-    while (await verifyMfaToken(wrong, secret)) wrong = String(Number(wrong) + 1).padStart(6, "0");
-    // This used to accept any nonempty code because the Promise was not awaited.
-    expect((await client.request("/api/mfa", { action: "verify", token: wrong, secret: generateMfaSecret() }, "POST")).status).toBe(400);
-    expect((await client.request("/api/mfa", { action: "verify", token: code }, "POST")).status).toBe(200);
-    return secret;
   }
   try {
     const create = Bun.spawn(["python3", "-c", `import sqlite3; c=sqlite3.connect('${temporary}/app.db'); c.execute('PRAGMA user_version=0'); c.close()`], { stdout: "ignore", stderr: "ignore" });
@@ -75,36 +62,25 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
     const schema = Bun.spawn(["node", "node_modules/prisma/build/index.js", "db", "push", "--skip-generate"], { cwd: root, env, stdout: log, stderr: log });
     expect(await schema.exited).toBe(0);
     const hash = await bcrypt.hash(password, 10);
-    const initial = await db.user.create({ data: { email: "admin@example.com", name: "HTTP Administrator", role: "SUPER_ADMIN", status: "ACTIVE", passwordHash: hash } });
+    const initial = await db.user.create({ data: { email: "admin@example.com", name: "HTTP Administrator", role: "SUPER_ADMIN", status: "ACTIVE", passwordHash: hash, mfaEnabled: true, mfaSecret: "legacy-setting-must-not-block-password-login" } });
     await db.user.create({ data: { email: "client@example.com", name: "HTTP Client", role: "CLIENT", status: "ACTIVE", passwordHash: hash } });
     await start();
-    const pending = await login(initial.email);
-    expect((await pending.session()).user?.role).toBe("SUPER_ADMIN");
-    expect((await pending.request("/admin/staff")).headers.get("location")).toContain("/staff-mfa");
-    expect((await pending.request("/api/admin/users", { name: "Forbidden", email: "blocked@example.com", password, role: "AGENT" }, "POST")).status).toBe(401);
-    const secret = await enroll(pending);
-    expect((await pending.request("/api/admin/users", {}, "POST")).status).toBe(401);
-    const noCode = await login(initial.email);
-    expect((await noCode.session()).user).toBeUndefined();
-    const badCode = await login(initial.email, "not-a-code");
-    expect((await badCode.session()).user).toBeUndefined();
-    const code = await generateCurrentTotp(secret);
-    const admin = await login(initial.email, code);
+    const wrongPassword = await login(initial.email, "incorrect-password");
+    expect((await wrongPassword.session()).user).toBeUndefined();
+    const admin = await login(initial.email);
     expect((await admin.session()).user?.role).toBe("SUPER_ADMIN");
-    const replay = await login(initial.email, code);
-    expect((await replay.session()).user).toBeUndefined();
-    expect((await admin.request("/admin/staff")).status).toBe(200);
-    expect((await admin.request("/api/mfa", { action: "disable" }, "POST")).status).toBe(403);
+    const directory = await admin.request("/admin/staff");
+    expect(directory.status).toBe(200);
+    expect(await directory.text()).not.toMatch(/MFA|Authenticator/);
+    expect((await admin.request("/api/mfa", { action: "init" }, "POST")).status).toBe(404);
+    expect((await admin.request("/staff-mfa")).status).toBe(404);
     const createManager = await admin.request("/api/admin/users", { name: "HTTP Manager", email: "manager@example.com", password, role: "MANAGER" }, "POST");
     expect(createManager.status).toBe(201);
     const managerId = (await createManager.json()).user.id;
     expect((await admin.request("/api/admin/users", { name: "Duplicate", email: "manager@example.com", password, role: "AGENT" }, "POST")).status).toBe(409);
     expect((await admin.request(`/api/admin/users/${initial.id}`, { name: initial.name, role: "SUPER_ADMIN", status: "SUSPENDED" }, "PATCH")).status).toBe(400);
-    // Restart this isolated process to clear its normal five-attempt login limit.
-    await stop(); await start();
-    const pendingManager = await login("manager@example.com");
-    const managerSecret = await enroll(pendingManager);
-    const manager = await login("manager@example.com", await generateCurrentTotp(managerSecret));
+    const manager = await login("manager@example.com");
+    expect((await manager.request("/admin")).status).toBe(200);
     expect((await manager.request("/api/admin/users", { name: "Escalation", email: "privileged@example.com", password, role: "SUPER_ADMIN" }, "POST")).status).toBe(403);
     const agent = await manager.request("/api/admin/users", { name: "New Agent", email: "agent@example.com", password, role: "AGENT" }, "POST");
     expect(agent.status).toBe(201);
@@ -141,11 +117,11 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
     expect(await audit.text()).toContain(initial.email);
     const signIn = await (await client.request("/sign-in")).text();
     expect(signIn).not.toContain("Demo accounts");
-    expect(signIn).toContain("Authenticator code");
+    expect(signIn).not.toContain("Authenticator code");
+    expect(signIn).not.toContain("one-time-code");
     const stored = await db.user.findUniqueOrThrow({ where: { id: initial.id } });
     expect(stored.lastLoginAt).not.toBeNull();
-    expect(stored.mfaSecret).not.toBe(secret);
-    expect(await db.auditLog.count({ where: { actorId: initial.id, action: "LOGIN_FAILED" } })).toBeGreaterThanOrEqual(3);
+    expect(await db.auditLog.count({ where: { actorId: initial.id, action: "LOGIN_FAILED" } })).toBeGreaterThanOrEqual(1);
     expect(await db.auditLog.count({ where: { action: "CREATE", objectType: "User" } })).toBeGreaterThanOrEqual(3);
     const inboxPage = await admin.request("/admin/inbox");
     expect(inboxPage.status).toBe(200); expect(await inboxPage.text()).toContain("Support inbox");
@@ -165,10 +141,6 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
     expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-verified", deliveryStatus: "QUEUED" } })).toBe(1);
     expect((await runReminders()).status).toBe(200);
     expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-reminder" } })).toBe(1);
-    // A console recovery reset must invalidate previously MFA-verified sessions.
-    const reset = Bun.spawn([process.execPath, "run", "scripts/reset-staff-mfa.ts", "--email", initial.email, "--confirm-reset"], { cwd: root, env, stdout: log, stderr: log });
-    expect(await reset.exited).toBe(0);
-    expect((await admin.request("/api/admin/users", {}, "POST")).status).toBe(401);
   } finally {
     await stop(); await db.$disconnect(); closeSync(log); rmSync(temporary, { recursive: true, force: true });
   }

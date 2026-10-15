@@ -53,7 +53,7 @@ Le script conserve les fichiers privés sous `/etc/parrotrehome/` avec droits ro
 
 ## Utilisation et mises à jour
 
-La gestion des comptes, le MFA obligatoire, les dernières connexions et la migration du journal sont décrits dans [staff-mfa.md](staff-mfa.md). Après le premier accès avec mot de passe, le personnel configure son authentificateur avant d’accéder à l’administration.
+La gestion des comptes et les dernières connexions sont décrites dans [staff-accounts.md](staff-accounts.md). La connexion utilise uniquement l’email et le mot de passe.
 
 - Site : `https://parrotrehome.com`
 - Administration : `https://parrotrehome.com/admin`

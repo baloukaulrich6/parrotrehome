@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { ParrotRehomeLogo } from "@/components/parrotrehome/logo";
 import { AdminSignOut } from "@/components/admin/sign-out";
-import { MfaSettingsDialog } from "@/components/admin/mfa-settings-dialog";
 
 export const metadata = { title: "Admin console" };
 
@@ -56,12 +55,6 @@ export default async function AdminLayout({
   const user = await requireStaffPage();
 
   const visibleNav = NAV.filter(item => (item.href !== "/admin/settings" || user.role === "SUPER_ADMIN") && (item.href !== "/admin/inbox" || ["SUPER_ADMIN", "MANAGER"].includes(user.role)));
-
-  // Fetch full user record for MFA flag (getServerUser doesn't return it)
-  const userFull = await db.user.findUnique({
-    where: { id: user.id },
-    select: { mfaEnabled: true },
-  });
 
   // Count new requests for the sidebar badge
   const newCount = await db.request.count({
@@ -129,7 +122,6 @@ export default async function AdminLayout({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <MfaSettingsDialog mfaEnabled={userFull?.mfaEnabled ?? false} email={user.email} />
             <Link
               href="/"
               className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 px-2 rounded-md bg-[var(--sidebar-accent)] hover:bg-[var(--sidebar-ring)] text-ivory/85 hover:text-ivory text-[12px] font-body font-medium transition-colors"
@@ -165,7 +157,6 @@ export default async function AdminLayout({
                 {item.label}
               </Link>
             ))}
-            <div className="p-3"><MfaSettingsDialog mfaEnabled={user.mfaEnabled} email={user.email} /></div>
           </nav>
         </details>
       </div>
