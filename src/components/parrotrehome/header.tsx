@@ -1,5 +1,6 @@
 "use client";
 
+import { defaultSiteSettings, type SiteSettings } from "@/lib/site-settings-schema";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -15,7 +16,7 @@ import {
   Heart,
 } from "lucide-react";
 import { ParrotRehomeLogo } from "./logo";
-import { BRAND, AVIAN_ADVICE_PRICE_PER_HOUR } from "@/lib/constants";
+import { AVIAN_ADVICE_PRICE_PER_HOUR } from "@/lib/constants";
 import { useCart } from "@/lib/cart-store";
 import { useFavoritesCount } from "@/components/parrotrehome/favorite-toggle";
 
@@ -27,7 +28,8 @@ const NAV = [
   { href: "/contact", label: "Contact" },
 ];
 
-export function ParrotRehomeHeader() {
+export function ParrotRehomeHeader({ settings = defaultSiteSettings }: { settings?: SiteSettings }) {
+  const BRAND = settings;
   const { data: session } = useSession();
   const cart = useCart((s) => s.items);
   const cartCount = cart.reduce((n, i) => n + i.qty, 0);
@@ -99,7 +101,7 @@ export function ParrotRehomeHeader() {
               className="focus-ring rounded-md"
               aria-label="ParrotRehome home"
             >
-              <ParrotRehomeLogo size="md" />
+              <ParrotRehomeLogo name={BRAND.name} tagline={BRAND.subTagline} size="md" />
             </Link>
 
             {/* Desktop nav */}

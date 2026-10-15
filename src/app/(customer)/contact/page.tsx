@@ -1,10 +1,11 @@
 import { db } from "@/lib/db";
-import { BRAND } from "@/lib/constants";
+import { readSiteSettings } from "@/lib/site-settings";
 import { Mail, Phone, MapPin, Clock, Send } from "lucide-react";
 
 export const metadata = { title: "Contact" };
 
 export default async function ContactPage() {
+  const BRAND = readSiteSettings();
   const faqs = await db.faqEntry.findMany({
     where: { isPublished: true },
     orderBy: { displayOrder: "asc" },
@@ -44,7 +45,7 @@ export default async function ContactPage() {
                 <Phone className="h-5 w-5 text-iris mt-0.5 flex-shrink-0" aria-hidden />
                 <div>
                   <p className="text-feather text-[12px] uppercase font-semibold tracking-wide">Phone</p>
-                  <p className="text-slate">{BRAND.phone}</p>
+                  <p className="text-slate">{BRAND.phone}{BRAND.secondaryPhone ? ` / ${BRAND.secondaryPhone}` : ""}</p>
                 </div>
               </li>
               <li className="flex items-start gap-3">

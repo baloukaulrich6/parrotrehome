@@ -1,8 +1,8 @@
+import { defaultSiteSettings, type SiteSettings } from "@/lib/site-settings-schema";
 import Link from "next/link";
 import { Mail, Phone, MapPin, Clock, Heart } from "lucide-react";
 import { ParrotRehomeLogo } from "./logo";
 import { NewsletterSubscribeForm } from "./newsletter-subscribe-form";
-import { BRAND } from "@/lib/constants";
 
 const FOOTER_LINKS = [
   {
@@ -34,14 +34,15 @@ const FOOTER_LINKS = [
   },
 ];
 
-export function ParrotRehomeFooter() {
+export function ParrotRehomeFooter({ settings = defaultSiteSettings }: { settings?: SiteSettings }) {
+  const BRAND = settings;
   return (
     <footer className="mt-auto bg-slate text-ivory">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
           {/* Brand block */}
           <div className="space-y-4">
-            <ParrotRehomeLogo variant="mono-light" size="md" showTagline={true} />
+            <ParrotRehomeLogo name={BRAND.name} tagline={BRAND.subTagline} variant="mono-light" size="md" showTagline={true} />
             <p className="text-ivory/80 text-[14px] font-body leading-relaxed max-w-sm">
               {BRAND.tagline} A US-based parrot e-commerce and avian consultation
               platform with manual, agent-verified payment workflow.
@@ -98,7 +99,7 @@ export function ParrotRehomeFooter() {
           </div>
           <div className="flex items-start gap-2">
             <Phone className="h-4 w-4 mt-0.5 text-iris" aria-hidden />
-            <span>{BRAND.phone}</span>
+            <span>{BRAND.phone}{BRAND.secondaryPhone ? ` / ${BRAND.secondaryPhone}` : ""}</span>
           </div>
           <div className="flex items-start gap-2">
             <MapPin className="h-4 w-4 mt-0.5 text-iris" aria-hidden />

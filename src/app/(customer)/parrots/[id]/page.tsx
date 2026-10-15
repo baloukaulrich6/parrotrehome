@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
+import { PhotoGallery } from "@/components/parrotrehome/photo-gallery";
+import { parsePhotos } from "@/lib/photo-data";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -35,7 +37,7 @@ export default async function BirdDetailPage({
   const bird = await db.bird.findUnique({ where: { id } });
   if (!bird) return notFound();
 
-  const photos: string[] = bird.photos ? JSON.parse(bird.photos) : [];
+  const photos = parsePhotos(bird.photos ?? "");
   const sourceDocs: { name?: string; uploadedAt?: string }[] = bird.sourceDocuments
     ? JSON.parse(bird.sourceDocuments)
     : [];
@@ -73,25 +75,7 @@ export default async function BirdDetailPage({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Photo */}
-            <div className="relative aspect-[4/5] lg:aspect-[5/6] rounded-xl overflow-hidden bg-feather/10 shadow-md">
-              {photos[0] ? (
-                <Image
-                  src={photos[0]}
-                  alt={`${bird.commonName} — ${bird.species}`}
-                  fill
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Bird className="h-16 w-16 text-feather/40" aria-hidden />
-                </div>
-              )}
-              <div className="absolute top-4 left-4">
-                <AvailabilityBadge label={status.label} className={status.className} />
-              </div>
-            </div>
+            <PhotoGallery photos={photos} name={`${bird.commonName} — ${bird.species}`} badge={<AvailabilityBadge label={status.label} className={status.className} />} />
 
             {/* Summary card */}
             <div className="flex flex-col">

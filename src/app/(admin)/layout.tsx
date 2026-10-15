@@ -18,6 +18,7 @@ import {
   Ticket,
   Mail,
   AlertCircle,
+  Settings,
 } from "lucide-react";
 import { ParrotRehomeLogo } from "@/components/parrotrehome/logo";
 import { AdminSignOut } from "@/components/admin/sign-out";
@@ -35,6 +36,7 @@ const NAV = [
   { href: "/admin/appointments", label: "Appointments", icon: CalendarClock },
   { href: "/admin/payment-methods", label: "Payment methods", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
+  { href: "/admin/settings", label: "Configuration", icon: Settings },
   { href: "/admin/email-templates", label: "Customer emails", icon: Mail },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail },
   { href: "/admin/customers", label: "Customers", icon: Users },
@@ -51,6 +53,8 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const user = await requireStaffPage();
+
+  const visibleNav = NAV.filter(item => item.href !== "/admin/settings" || user.role === "SUPER_ADMIN");
 
   // Fetch full user record for MFA flag (getServerUser doesn't return it)
   const userFull = await db.user.findUnique({
@@ -79,7 +83,7 @@ export default async function AdminLayout({
           </Link>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scroll">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const badge =
               item.href === "/admin/requests"
                 ? newCount + toVerifyCount > 0
@@ -150,7 +154,7 @@ export default async function AdminLayout({
             className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg py-2 z-50"
             style={{ backgroundColor: "var(--sidebar)" }}
           >
-            {NAV.map((item) => (
+            {visibleNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

@@ -1,5 +1,8 @@
+import { readSiteSettings } from "@/lib/site-settings";
 import { ParrotRehomeHeader } from "@/components/parrotrehome/header";
 import { ParrotRehomeFooter } from "@/components/parrotrehome/footer";
+
+export const dynamic = "force-dynamic";
 
 // ============================================================
 // Customer layout — wraps all public/customer-facing pages
@@ -13,11 +16,12 @@ export default function CustomerLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const settings = readSiteSettings();
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <ParrotRehomeHeader />
+      <ParrotRehomeHeader settings={settings} />
       <main className="flex-1">{children}</main>
-      <ParrotRehomeFooter />
+      <ParrotRehomeFooter settings={settings} />
     </div>
   );
 }

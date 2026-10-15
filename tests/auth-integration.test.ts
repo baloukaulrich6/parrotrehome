@@ -7,6 +7,7 @@ import path from "node:path";
 import { createServer } from "node:net";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { defaultSiteSettings } from "../src/lib/site-settings-schema";
 import { generateCurrentTotp, generateMfaSecret, verifyMfaToken } from "../src/lib/mfa";
 
 test("real sign-in, MFA enrollment/enforcement, staff management and activity history", async () => {
@@ -21,7 +22,7 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
   const port = (socket.address() as { port: number }).port;
   await new Promise<void>((resolve) => socket.close(() => resolve()));
   const base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, DATABASE_URL: `file:${temporary}/app.db`, NEXTAUTH_URL: base, NEXTAUTH_SECRET: "isolated-http-test-only-secret-over-32-chars", NEXT_TELEMETRY_DISABLED: "1", MAIL_TRANSPORT: "preview" };
+  const env = { ...process.env, DATABASE_URL: `file:${temporary}/app.db`, NEXTAUTH_URL: base, NEXTAUTH_SECRET: "isolated-http-test-only-secret-over-32-chars", NEXT_TELEMETRY_DISABLED: "1", MAIL_TRANSPORT: "preview", SITE_SETTINGS_FILE: path.join(temporary, "site-settings.json") };
   const db = new PrismaClient({ datasourceUrl: env.DATABASE_URL });
   const password = "Only-for-local-integration-tests";
   let server: ReturnType<typeof Bun.spawn> | undefined;
@@ -109,6 +110,25 @@ test("real sign-in, MFA enrollment/enforcement, staff management and activity hi
     expect(agent.status).toBe(201);
     const client = await login("client@example.com");
     expect((await client.request("/api/admin/users", {}, "POST")).status).toBe(403);
+    const settings = { ...defaultSiteSettings, name: "Gallery Test Center", email: "contact@gallery.example", phone: "+33 1 23 45 67 89", secondaryPhone: "+33 6 12 34 56 78", address: "18 Feather Street", hours: "Monday to Friday, 09:00–18:00" };
+    expect((await manager.request("/api/admin/site-settings", settings, "PUT")).status).toBe(403);
+    expect((await client.request("/api/admin/site-settings", settings, "PUT")).status).toBe(403);
+    expect((await admin.request("/api/admin/site-settings", { ...settings, email: "invalid" }, "PUT")).status).toBe(400);
+    expect((await admin.request("/api/admin/site-settings", settings, "PUT")).status).toBe(200);
+    expect((await admin.request("/admin/settings")).status).toBe(200);
+    const publicContact = await (await new Client().request("/contact")).text();
+    for (const value of [settings.name, settings.email, settings.phone, settings.secondaryPhone, settings.address, settings.hours]) expect(publicContact).toContain(value);
+    const photos = ["https://example.com/front.webp", "https://example.com/side.webp", "https://example.com/back.webp"];
+    const bird = await db.bird.create({ data: { species: "African Grey", commonName: "Gallery Bird", photos: JSON.stringify(photos) } });
+    const detail = await new Client().request(`/parrots/${bird.id}`);
+    expect(detail.status).toBe(200);
+    const detailHtml = await detail.text();
+    for (const photo of photos) expect(detailHtml).toContain(photo);
+    expect(detailHtml).toContain("View photo 3 of Gallery Bird");
+    expect(await db.auditLog.count({ where: { objectType: "SiteSettings", action: "UPDATE" } })).toBe(1);
+    // Changes must survive a fresh server process, without a rebuild.
+    await stop(); await start();
+    expect(await (await new Client().request("/contact")).text()).toContain(settings.email);
     const createdClient = await admin.request("/api/admin/users", { name: "Created Client", email: "new-client@example.com", password, role: "CLIENT" }, "POST");
     expect(createdClient.status).toBe(201);
     expect((await admin.request(`/api/admin/users/${managerId}`, { name: "HTTP Manager", role: "MANAGER", status: "SUSPENDED" }, "PATCH")).status).toBe(200);

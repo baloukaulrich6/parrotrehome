@@ -5,10 +5,14 @@ export function ParrotRehomeLogo({
   variant = "color",
   size = "md",
   showTagline = true,
+  name = "ParrotRehome",
+  tagline = "Birds · Supplies · Avian Care",
 }: {
   variant?: "color" | "mono-light" | "mono-dark";
   size?: "sm" | "md" | "lg";
   showTagline?: boolean;
+  name?: string;
+  tagline?: string;
 }) {
   const sizes = {
     sm: { word: "text-xl", tag: "text-[10px]", emblem: 24 },
@@ -71,12 +75,11 @@ export function ParrotRehomeLogo({
       </span>
       <div className="flex flex-col leading-none">
         <div className={`font-heading font-bold tracking-tight ${s.word}`}>
-          <span className={parrotColor}>Parrot</span>
-          <span className={rehomeColor}>Rehome</span>
+          {name === "ParrotRehome" ? <><span className={parrotColor}>Parrot</span><span className={rehomeColor}>Rehome</span></> : <span className={parrotColor}>{name}</span>}
         </div>
         {showTagline && (
           <span className={`${s.tag} ${tagColor} font-body font-medium tracking-[0.18em] uppercase mt-1`}>
-            Birds · Supplies · Avian Care
+            {tagline}
           </span>
         )}
       </div>
