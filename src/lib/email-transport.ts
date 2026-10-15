@@ -21,7 +21,7 @@ export async function deliverEmail(payload: { toAddress: string; subject: string
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": createHash("sha256").update(key).digest("hex") },
-    body: JSON.stringify({ from: `ParrotRehome <${config.from}>`, to: [payload.toAddress], reply_to: replyTo, subject: payload.subject, text: payload.body, html: payload.html || renderEmailHtml(payload.subject, payload.body) }),
+    body: JSON.stringify({ from: `ParrotRehome <${config.from}>`, to: [payload.toAddress], reply_to: replyTo, subject: payload.subject, text: payload.body, html: payload.html || renderEmailHtml(payload.subject, payload.body, process.env.NEXTAUTH_URL) }),
     signal: AbortSignal.timeout(15000),
   });
   const result = await response.json().catch(() => null);

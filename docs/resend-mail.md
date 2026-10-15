@@ -73,7 +73,7 @@ Le planificateur du VPS doit être installé et actif. Il faut ce déclencheur p
 
 ## Modèles et aperçu
 
-**Customer emails** (`/admin/email-templates`) présente six modèles personnalisables et leurs aperçus HTML : demande reçue, instructions CHMK, relance avant expiration, référence reçue, paiement vérifié et réponse d’agent. Les couleurs reprennent l’ivoire, le vert, le gris ardoise et l’or du site. Les textes sont en anglais comme l’interface client. L’aperçu statique [email-templates-preview.html](email-templates-preview.html) contient des exemples sans données réelles.
+**Customer emails** (`/admin/email-templates`) présente six modèles personnalisables et leurs aperçus HTML : demande reçue, instructions CHMK, relance avant expiration, référence reçue, paiement vérifié et réponse d’agent. Le logo validé est intégré à l’en-tête des emails à partir de l’image publique `/brand/parrotrehome-emblem.png`. Les logiciels de messagerie peuvent demander au destinataire d’autoriser le chargement des images ; le nom reste affiché en texte. Les couleurs reprennent l’ivoire, le vert, le gris ardoise et l’or du site. Les textes sont en anglais comme l’interface client. L’aperçu statique [email-templates-preview.html](email-templates-preview.html) contient des exemples sans données réelles.
 
 Les modèles de rendez-vous existants continuent à utiliser le transport commun et le même habillage HTML ; ils ne sont pas modifiés par les six éditeurs de commande.
 

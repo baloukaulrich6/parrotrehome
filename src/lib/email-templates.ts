@@ -117,5 +117,5 @@ export function resolveEmailTemplate(name: EditableEmailTemplate, variables: Rec
   const resolve = (text: string) => text.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => variables[key] ?? "");
   const subject = resolve(template.subject).replace(/[\r\n]/g, " ");
   const body = resolve(template.body);
-  return { subject, body, html: renderEmailHtml(subject, body) };
+  return { subject, body, html: renderEmailHtml(subject, body, process.env.NEXTAUTH_URL) };
 }

@@ -28,7 +28,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "ParrotRehome" }],
   icons: {
-    icon: "/favicon.svg",
+    icon: "/brand/parrotrehome-emblem.png",
+    apple: "/brand/parrotrehome-emblem.png",
   },
   openGraph: {
     title: "ParrotRehome — A brighter life with birds",
