@@ -6,8 +6,11 @@ import { audit } from "@/lib/audit";
 import { z } from "zod";
 
 const schema = z.object({
-  active: z.boolean(),
-});
+  active: z.boolean().optional(),
+  name: z.string().trim().min(2).max(100).optional(),
+  officialProvider: z.string().trim().min(2).max(100).optional(),
+  instructionsTemplate: z.string().trim().min(20).max(5000).optional(),
+}).refine((value) => Object.keys(value).length > 0);
 
 export async function PATCH(
   req: Request,
@@ -27,7 +30,7 @@ export async function PATCH(
     }
     const method = await db.paymentMethod.update({
       where: { id },
-      data: { active: parsed.data.active },
+      data: parsed.data,
     });
     await audit({
       actorId: user.id,

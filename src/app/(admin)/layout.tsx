@@ -36,6 +36,7 @@ const NAV = [
   { href: "/admin/appointments", label: "Appointments", icon: CalendarClock },
   { href: "/admin/payment-methods", label: "Payment methods", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
+  { href: "/admin/email-templates", label: "Customer emails", icon: Mail },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/staff", label: "Staff", icon: ShieldCheck },

@@ -1,3 +1,4 @@
+import { SecureInstructionsView } from "@/components/parrotrehome/secure-instructions-view";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -37,7 +38,7 @@ export default async function SecureInstructionsPage({
   if (!instruction) return notFound();
 
   const isExpired =
-    new Date(instruction.expiryAt).getTime() < Date.now() ||
+    new Date(instruction.expiryAt).getTime() <= Date.now() ||
     instruction.status === "EXPIRED";
   const isRevoked = instruction.status === "REVOKED";
   const blocked = isExpired || isRevoked;
@@ -102,14 +103,7 @@ export default async function SecureInstructionsPage({
                   email.</strong>
                 </p>
 
-                <div className="bg-ivory border border-feather/20 rounded-lg p-4 my-4">
-                  <p className="text-[11px] font-body font-semibold text-feather uppercase tracking-wide mb-2">
-                    Official instructions
-                  </p>
-                  <pre className="whitespace-pre-wrap font-body text-[14px] text-slate leading-relaxed">
-                    {instruction.body}
-                  </pre>
-                </div>
+                <SecureInstructionsView instructionId={instruction.id} secureLinkHash={instruction.secureLinkHash} body={instruction.body} expiryAt={instruction.expiryAt} status={instruction.status} />
 
                 <div className="grid grid-cols-2 gap-3 text-[13px] font-body mb-4">
                   <div>

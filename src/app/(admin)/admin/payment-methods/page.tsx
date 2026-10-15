@@ -1,9 +1,14 @@
+import { getServerUser } from "@/lib/auth";
+import { can } from "@/lib/rbac";
+import { PaymentMethodEditor } from "@/components/admin/payment-method-editor";
 import { db } from "@/lib/db";
 import { PaymentMethodToggle } from "@/components/admin/payment-method-toggle";
 
 export const metadata = { title: "Payment methods — Admin" };
 
 export default async function AdminPaymentMethodsPage() {
+  const user = await getServerUser();
+  const canConfigure = !!user && can(user.role, "payment:configure");
   const methods = await db.paymentMethod.findMany({
     orderBy: { displayOrder: "asc" },
   });
@@ -29,7 +34,7 @@ export default async function AdminPaymentMethodsPage() {
                 <h2 className="font-heading text-slate text-[18px] font-semibold">{m.name}</h2>
                 <p className="text-feather text-[12px] font-body">{m.officialProvider}</p>
               </div>
-              <PaymentMethodToggle id={m.id} active={m.active} />
+              {canConfigure && <PaymentMethodToggle id={m.id} active={m.active} />}
             </div>
             <div className="bg-ivory border border-feather/20 rounded-md p-3">
               <p className="text-[11px] text-feather uppercase font-semibold tracking-wide mb-1">Instructions template</p>
@@ -37,6 +42,7 @@ export default async function AdminPaymentMethodsPage() {
                 {m.instructionsTemplate}
               </pre>
             </div>
+            {canConfigure && <PaymentMethodEditor method={m} />}
             <p className="text-[11px] text-feather font-body mt-2">
               Placeholders <code className="bg-ivory px-1 rounded text-[10px]">{`{{requestReference}}`}</code> and{" "}
               <code className="bg-ivory px-1 rounded text-[10px]">{`{{totalQuoteUsd}}`}</code> are auto-filled when the agent sends instructions.

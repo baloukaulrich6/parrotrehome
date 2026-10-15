@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { audit } from "@/lib/audit";
+import { photosSchema } from "@/lib/photo-schema";
 import { z } from "zod";
 
 const schema = z.object({
@@ -15,7 +16,7 @@ const schema = z.object({
   priceUsd: z.number().positive(),
   stockQty: z.number().int().min(0),
   isActive: z.boolean(),
-  photos: z.string(),
+  photos: photosSchema,
   features: z.string(),
 });
 

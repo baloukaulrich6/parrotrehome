@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { canTransition } from "@/lib/constants";
+import { instructionsUsable } from "@/lib/payment-window";
 import { z } from "zod";
 
 // POST /api/requests/[id]/deposit-reference
@@ -52,6 +53,13 @@ export async function POST(
       );
     }
 
+    const instruction = await db.paymentInstruction.findFirst({
+      where: { requestId: id, status: "ACTIVE" }, orderBy: { createdAt: "desc" },
+    });
+    if (!instruction || !instructionsUsable(instruction.status, instruction.expiryAt)) {
+      return NextResponse.json({ error: "Payment instructions have expired. Request new instructions from your agent." }, { status: 410 });
+    }
+
     const newStatus = "PAYMENT_TO_VERIFY";
     if (request.status !== newStatus && !canTransition(request.status, newStatus)) {
       // Allow staying in PAYMENT_TO_VERIFY for re-deposit
@@ -61,13 +69,15 @@ export async function POST(
       );
     }
 
-    await db.request.update({
-      where: { id },
+    const changed = await db.request.updateMany({
+      where: { id, status: request.status, paymentInstructions: { some: { id: instruction.id, status: "ACTIVE", expiryAt: { gt: new Date() } } } },
       data: {
         status: newStatus,
         paymentReference: parsed.data.reference,
       },
     });
+
+    if (changed.count !== 1) return NextResponse.json({ error: "Instructions expired or changed. Refresh your request." }, { status: 410 });
 
     await audit({
       actorId: user.id,

@@ -1,3 +1,4 @@
+import { resolveEmailTemplate } from "./email-templates";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
 import { randomBytes } from "crypto";
@@ -23,35 +24,37 @@ export interface EmailPayload {
   requestId: string;
   senderId?: string;
   senderRole: string; // "system" | "no-reply" | "agent:NAME"
-  template: "request-received" | "instructions-ready" | "appointment-received" | "appointment-confirmed" | "status-update";
+  template: "request-received" | "instructions-ready" | "appointment-received" | "appointment-confirmed" | "status-update" | "appointment-reminder";
   toAddress: string;
   fromAddress: string;
   subject: string;
   body: string;
+  html?: string;
+  eventId?: string;
 }
 
 const NO_REPLY = "no-reply@parrotrehome.com";
 
 // Idempotency key for retry safety
 function idempotencyKey(p: EmailPayload): string {
-  return `${p.requestId}:${p.template}:${p.toAddress}`;
+  return `${p.requestId}:${p.template}:${p.toAddress}:${p.eventId ?? p.body}`;
 }
 
 // In-memory dedupe (per-process) — production should use Redis or DB unique constraint
 const sentKeys = new Set<string>();
 
-export async function sendEmail(payload: EmailPayload): Promise<{ messageId: string; status: "SENT" | "FAILED" | "DUPLICATE" }> {
+export async function sendEmail(payload: EmailPayload): Promise<{ messageId: string; status: "QUEUED" | "SENT" | "FAILED" | "DUPLICATE" }> {
   const key = idempotencyKey(payload);
   if (sentKeys.has(key)) {
     return { messageId: "duplicate", status: "DUPLICATE" };
   }
 
-  let status: "SENT" | "FAILED" = "SENT";
+  let status: "QUEUED" | "SENT" | "FAILED" = "QUEUED";
   let errorMessage: string | undefined;
 
   try {
     await deliverEmail(payload);
-    sentKeys.add(key);
+
   } catch (err) {
     status = "FAILED";
     errorMessage = err instanceof Error ? err.message : String(err);
@@ -73,26 +76,23 @@ export async function sendEmail(payload: EmailPayload): Promise<{ messageId: str
     },
   });
 
+  if (status !== "FAILED") sentKeys.add(key);
+
   if (status === "FAILED") {
-    console.error(`[email] FAILED to send '${payload.template}' to ${payload.toAddress}:`, errorMessage);
+    console.error(`[email] FAILED to send '${payload.template}' (req=${payload.requestId}):`, errorMessage);
   } else {
-    console.log(`[email] SENT '${payload.template}' to ${payload.toAddress} (req=${payload.requestId})`);
+    console.log(`[email] PREVIEW '${payload.template}' (req=${payload.requestId})`);
   }
 
   return { messageId: message.id, status };
 }
 
-// Sandbox delivery: console log. Production: replace with Resend client.
-async function deliverEmail(p: EmailPayload): Promise<void> {
-  console.log("─────────── EMAIL ───────────");
-  console.log(`From: ${p.fromAddress}`);
-  console.log(`To: ${p.toAddress}`);
-  console.log(`Subject: ${p.subject}`);
-  console.log(`Template: ${p.template}`);
-  console.log(`Request ID: ${p.requestId}`);
-  console.log("─── Body ───");
-  console.log(p.body);
-  console.log("─────────────────────────────");
+// Demonstration transport: save only the message in the database below.
+// Never report a preview as SENT, and never transmit client data during a demo.
+async function deliverEmail(_p: EmailPayload): Promise<void> {
+  if (process.env.MAIL_TRANSPORT && process.env.MAIL_TRANSPORT !== "preview") {
+    throw new Error("Live email delivery is not configured. Set MAIL_TRANSPORT=preview for the demo.");
+  }
 }
 
 // ============================================================
@@ -136,8 +136,7 @@ Thank you for choosing responsible avian companionship.
     template: "request-received",
     toAddress: opts.customerEmail,
     fromAddress: NO_REPLY,
-    subject: `Request #${opts.reference} received — ParrotRehome`,
-    body,
+    ...resolveEmailTemplate("request-received", { customerName: opts.customerName, reference: opts.reference, message: body }),
   };
 }
 
@@ -149,36 +148,31 @@ export function buildInstructionsReadyEmail(opts: {
   agentRole: string;
   secureLink: string;
   expiryAt: Date;
+  paymentMethodName?: string;
+  totalUsd?: number | null;
 }): EmailPayload {
   const expiry = opts.expiryAt.toLocaleString("en-US", {
     timeZone: "UTC",
     timeZoneName: "short",
   });
-  const body = `Dear ${opts.customerName},
-
-Your secure payment instructions are ready. Sign in to review them. Do not send card numbers or passwords by email.
-
-──────────────────
-INSTRUCTIONS
-──────────────────
-Request: #${opts.reference}
-Prepared by: ${opts.agentName} (${opts.agentRole})
-
-Secure link (expires ${expiry}):
-${opts.secureLink}
-
-This link is personal, traceable, and will expire at the time above. If you have any concerns, contact our team through your "My Requests" page.
-
-— ParrotRehome Team
-On behalf of ${opts.agentName}`;
+  const method = process.env.PAYMENT_EMAIL_LABEL || "CHMK";
+  const content = resolveEmailTemplate("instructions-ready", {
+    customerName: opts.customerName,
+    reference: opts.reference,
+    paymentLabel: method,
+    selectedMethod: opts.paymentMethodName || method,
+    agentName: opts.agentName,
+    expiry: expiry,
+    secureLink: opts.secureLink,
+    amount: opts.totalUsd == null ? "See the amount in your request" : `$${opts.totalUsd.toFixed(2)} USD`,
+  });
   return {
     requestId: "",
     senderRole: `agent:${opts.agentName}`,
     template: "instructions-ready",
     toAddress: opts.customerEmail,
     fromAddress: NO_REPLY, // domain-authenticated no-reply, but signed in body
-    subject: `Secure payment instructions ready — Request #${opts.reference}`,
-    body,
+    ...content,
   };
 }
 

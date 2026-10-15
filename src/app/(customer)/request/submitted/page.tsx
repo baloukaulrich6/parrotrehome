@@ -1,11 +1,12 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, ArrowRight, Mail, User as UserIcon } from "lucide-react";
 import { ParrotRehomeLogo } from "@/components/parrotrehome/logo";
 
-export default function RequestSubmittedPage() {
+function RequestSubmittedContent() {
   const sp = useSearchParams();
   const reference = sp.get("ref") ?? "—";
   const requestId = sp.get("id");
@@ -70,7 +71,7 @@ export default function RequestSubmittedPage() {
             <div className="mt-4 p-3 bg-iris/5 border border-iris/20 rounded-lg flex items-start gap-2">
               <Mail className="h-4 w-4 text-iris flex-shrink-0 mt-0.5" aria-hidden />
               <p className="text-[13px] font-body text-slate">
-                A confirmation email has been sent{email ? ` to ${email}` : ""}. Check your inbox (and spam folder) for the message from <code className="bg-ivory px-1 rounded text-[12px]">no-reply@parrotrehome.com</code>.
+                Keep your request reference. Your confirmation and messages are available in My Requests.
               </p>
             </div>
           </div>
@@ -119,4 +120,8 @@ export default function RequestSubmittedPage() {
       </div>
     </div>
   );
+}
+
+export default function RequestSubmittedPage() {
+  return <Suspense fallback={<p className="p-6 text-feather">Loading…</p>}><RequestSubmittedContent /></Suspense>;
 }

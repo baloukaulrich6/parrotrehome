@@ -10,6 +10,7 @@ import {
   buildSecureInstructionsLink,
 } from "@/lib/email";
 import { canTransition } from "@/lib/constants";
+import { paymentExpiry } from "@/lib/payment-window";
 import { z } from "zod";
 
 // POST /api/admin/requests/[id]/instructions
@@ -18,7 +19,6 @@ import { z } from "zod";
 
 const schema = z.object({
   body: z.string().min(20, "Instructions body is too short").max(5000),
-  expiresHours: z.number().int().min(1).max(168),
 });
 
 export async function POST(
@@ -53,7 +53,7 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (request.status !== "AWAITING_INSTRUCTIONS") {
+    if (!["AWAITING_INSTRUCTIONS", "INSTRUCTIONS_SENT"].includes(request.status)) {
       return NextResponse.json(
         { error: `Cannot create instructions in status ${request.status}` },
         { status: 400 }
@@ -67,37 +67,33 @@ export async function POST(
     }
 
     const newStatus = "INSTRUCTIONS_SENT";
-    if (!canTransition(request.status, newStatus)) {
+    if (request.status !== newStatus && !canTransition(request.status, newStatus)) {
       return NextResponse.json({ error: "Invalid transition" }, { status: 400 });
     }
 
     // T-04: generate non-guessable secure link hash
     const secureLinkHash = generateSecureLinkHash();
-    const expiryAt = new Date(Date.now() + parsed.data.expiresHours * 60 * 60 * 1000);
+    const expiryAt = paymentExpiry();
 
-    // Revoke any previous active instructions
-    await db.paymentInstruction.updateMany({
-      where: { requestId: id, status: "ACTIVE" },
-      data: { status: "REVOKED", revokedAt: new Date() },
-    });
-
-    // Create new instruction
-    const instruction = await db.paymentInstruction.create({
-      data: {
-        requestId: id,
-        agentId: user.id,
-        secureLinkHash,
-        body: parsed.data.body,
-        expiryAt,
-        status: "ACTIVE",
-        version: 1,
-      },
-    });
-
-    // Update request status
-    await db.request.update({
-      where: { id },
-      data: { status: newStatus, instructionsSentAt: new Date() },
+    // Publish a new version and revoke the old link atomically.
+    const instruction = await db.$transaction(async (tx) => {
+      const changed = await tx.request.updateMany({
+        where: { id, status: request.status, selectedPaymentMethodId: request.selectedPaymentMethodId },
+        data: { status: newStatus, instructionsSentAt: new Date() },
+      });
+      if (changed.count !== 1) throw new Error("Request changed. Refresh before sending instructions.");
+      const previous = await tx.paymentInstruction.findFirst({
+        where: { requestId: id }, orderBy: { version: "desc" },
+      });
+      await tx.paymentInstruction.updateMany({
+        where: { requestId: id, status: "ACTIVE" },
+        data: { status: "REVOKED", revokedAt: new Date() },
+      });
+      return tx.paymentInstruction.create({ data: {
+        requestId: id, agentId: user.id, secureLinkHash,
+        body: parsed.data.body, expiryAt, status: "ACTIVE",
+        version: (previous?.version ?? 0) + 1,
+      } });
     });
 
     // Audit (A-11)
@@ -118,7 +114,7 @@ export async function POST(
     );
 
     // Send agent-signed email to customer (F-25 / Message Agent Official)
-    const host = req.headers.get("origin") ?? "https://parrotrehome.com";
+    const host = process.env.NEXTAUTH_URL || new URL(req.url).origin;
     const secureLink = buildSecureInstructionsLink(host, secureLinkHash);
     const emailPayload = buildInstructionsReadyEmail({
       reference: request.reference,
@@ -128,12 +124,16 @@ export async function POST(
       agentRole: user.role.replace(/_/g, " ").toLowerCase(),
       secureLink,
       expiryAt,
+      paymentMethodName: request.selectedPaymentMethod.name,
+      totalUsd: request.totalQuoteUsd == null ? null : Number(request.totalQuoteUsd),
     });
     emailPayload.requestId = id;
-    await sendEmail(emailPayload);
+    emailPayload.eventId = instruction.id;
+    const delivery = await sendEmail(emailPayload);
 
     return NextResponse.json({
       ok: true,
+      emailStatus: delivery.status,
       instructionId: instruction.id,
       secureLink,
       expiresAt: expiryAt.toISOString(),

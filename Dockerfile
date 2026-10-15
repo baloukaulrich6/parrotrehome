@@ -1,0 +1,35 @@
+FROM node:22-bookworm-slim AS build
+RUN --mount=type=secret,id=build_ca \
+    if [ -f /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
+    apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates python3 build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g bun@1.3.4
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN --mount=type=secret,id=build_ca \
+    if [ -f /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
+    bun install --frozen-lockfile
+COPY . .
+# Disposable build database; no runtime secrets or client data enter the image.
+ENV DATABASE_URL=file:/tmp/parrotrehome-build.db NEXTAUTH_URL=http://localhost:3000 MAIL_TRANSPORT=preview NEXT_TELEMETRY_DISABLED=1
+RUN --mount=type=secret,id=build_ca \
+    if [ -f /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
+    bun run db:generate \
+    && python3 -c 'import sqlite3; c=sqlite3.connect("/tmp/parrotrehome-build.db"); c.execute("PRAGMA user_version=0"); c.close()' \
+    && bun x prisma db push --skip-generate \
+    && bun test tests/demo-workflow.test.ts tests/image-upload.test.ts tests/deployment-bootstrap.test.ts \
+    && bun run build \
+    && rm -f /tmp/parrotrehome-build.db
+
+FROM build AS setup
+CMD ["bash", "scripts/docker-init.sh"]
+
+FROM node:22-bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3000 NEXT_TELEMETRY_DISABLED=1
+COPY --from=build --chown=node:node /app/.next/standalone ./
+USER node
+EXPOSE 3000
+CMD ["node", "server.js"]

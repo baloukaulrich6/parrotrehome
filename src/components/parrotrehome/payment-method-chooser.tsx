@@ -8,7 +8,6 @@ interface PaymentMethod {
   id: string;
   name: string;
   officialProvider: string;
-  instructionsTemplate: string;
 }
 
 export function PaymentMethodChooser({ requestId }: { requestId: string }) {

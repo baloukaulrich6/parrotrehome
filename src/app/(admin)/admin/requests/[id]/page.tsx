@@ -1,3 +1,4 @@
+import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -89,6 +90,7 @@ export default async function DossierPage({
 
   return (
     <div className="space-y-5">
+      <LiveRequestRefresh />
       {/* Header */}
       <div>
         <Link
@@ -379,7 +381,7 @@ export default async function DossierPage({
             )}
 
             {/* Create payment instructions */}
-            {canPrepareInstructions && request.status === "AWAITING_INSTRUCTIONS" && request.selectedPaymentMethod && (
+            {canPrepareInstructions && ["AWAITING_INSTRUCTIONS", "INSTRUCTIONS_SENT"].includes(request.status) && request.selectedPaymentMethod && (
               <CreateInstructionsForm
                 requestId={request.id}
                 paymentMethod={request.selectedPaymentMethod}

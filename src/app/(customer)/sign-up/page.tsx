@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { ParrotRehomeLogo } from "@/components/parrotrehome/logo";
@@ -9,7 +10,7 @@ import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { trackConversion } from "@/components/google-analytics";
 
-export default function SignUpPage() {
+function SignUpContent() {
   const router = useRouter();
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") || "/";
@@ -204,4 +205,8 @@ export default function SignUpPage() {
       </div>
     </div>
   );
+}
+
+export default function SignUpPage() {
+  return <Suspense fallback={<p className="p-6 text-feather">Loading…</p>}><SignUpContent /></Suspense>;
 }

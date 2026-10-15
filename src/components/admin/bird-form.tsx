@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageUpload } from "./image-upload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -37,6 +38,7 @@ export function BirdFormDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
     species: bird?.species ?? "",
     commonName: bird?.commonName ?? "",
@@ -155,9 +157,7 @@ export function BirdFormDialog({
               <input id="originState" type="text" value={form.originState} onChange={(e) => update("originState", e.target.value)} className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
             </Field>
           </div>
-          <Field label="Photo URL" htmlFor="photos">
-            <input id="photos" type="url" value={form.photos.startsWith("[") ? "" : form.photos} onChange={(e) => update("photos", e.target.value)} placeholder="https://..." className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
-          </Field>
+          <ImageUpload value={form.photos} onChange={(value) => update("photos", value)} onBusyChange={setUploading} />
           <Field label="Short description" htmlFor="shortDescription">
             <textarea id="shortDescription" rows={2} value={form.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} className="w-full px-3 py-2 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
           </Field>
@@ -171,7 +171,7 @@ export function BirdFormDialog({
             <button type="button" onClick={() => setOpen(false)} className="h-10 px-4 rounded-md border border-feather/30 hover:bg-feather/10 text-slate text-[13px] font-body font-semibold">
               Cancel
             </button>
-            <button type="submit" disabled={submitting} className="h-10 px-4 rounded-md bg-tail-red hover:bg-tail-red-dark text-white text-[13px] font-body font-semibold disabled:bg-feather/40">
+            <button type="submit" disabled={submitting || uploading} className="h-10 px-4 rounded-md bg-tail-red hover:bg-tail-red-dark text-white text-[13px] font-body font-semibold disabled:bg-feather/40">
               {submitting ? "Saving..." : mode === "create" ? "Create dossier" : "Save changes"}
             </button>
           </div>

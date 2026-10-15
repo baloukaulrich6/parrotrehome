@@ -1,5 +1,6 @@
 "use client";
 
+import { usePaymentCountdown } from "./payment-countdown";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Upload, ShieldCheck, Send, Clock, Check } from "lucide-react";
@@ -7,10 +8,13 @@ import { Upload, ShieldCheck, Send, Clock, Check } from "lucide-react";
 export function PaymentReferenceDeposit({
   requestId,
   existingReference,
+  expiryAt,
 }: {
   requestId: string;
+  expiryAt: Date | string;
   existingReference?: string | null;
 }) {
+  const remaining = usePaymentCountdown(expiryAt);
   const [reference, setReference] = useState(existingReference ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -62,9 +66,10 @@ export function PaymentReferenceDeposit({
         placeholder="e.g., WIRE-2026-001234"
         className="mt-1 w-full h-11 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring"
       />
+      {remaining === 0 && <p className="text-sm text-tail-red mt-2">Instructions expired. Ask your agent for new payment details.</p>}
       <button
         type="submit"
-        disabled={submitting || submitted}
+        disabled={submitting || submitted || remaining === null || remaining === 0}
         className="mt-3 w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-full bg-forest hover:bg-forest-dark text-white text-[14px] font-body font-semibold transition-colors focus-ring disabled:bg-feather/40"
       >
         {submitted ? (
