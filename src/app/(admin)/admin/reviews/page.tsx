@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -15,6 +16,7 @@ export default async function AdminReviewsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
   const user = await getServerUser();
   if (!user) return null;

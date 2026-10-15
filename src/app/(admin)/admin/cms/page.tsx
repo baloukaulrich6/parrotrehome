@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatDateUTC } from "@/lib/constants";
@@ -10,6 +11,7 @@ import { getServerUser } from "@/lib/auth";
 export const metadata = { title: "CMS — Admin" };
 
 export default async function AdminCmsPage() {
+  await requireStaffPage();
   const user = await getServerUser();
   const canManage = user ? can(user.role, "cms:manage") : false;
   const pages = await db.cmsPage.findMany({

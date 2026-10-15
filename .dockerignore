@@ -17,3 +17,5 @@ deploy/secrets
 **/.ssh
 **/.aws
 **/.codex
+**/__pycache__
+**/*.pyc

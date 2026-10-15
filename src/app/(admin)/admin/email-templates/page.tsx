@@ -1,9 +1,11 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import { readEmailTemplates } from "@/lib/email-templates";
 import { EmailTemplateEditor } from "@/components/admin/email-template-editor";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 
 export default async function EmailTemplatesPage() {
+  await requireStaffPage();
   const user = await getServerUser();
   const templates = readEmailTemplates();
   return <div className="space-y-5">

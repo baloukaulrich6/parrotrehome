@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
@@ -16,6 +17,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export default async function AdminPendingActionsPage() {
+  await requireStaffPage();
   const user = await getServerUser();
   if (!user) return null;
   if (!can(user.role, "payment:validate") && !can(user.role, "inventory:manage_birds")) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
-import { auditLog } from "@/lib/audit";
+import { auditLog, audit } from "@/lib/audit";
 import { canTransition } from "@/lib/constants";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ const schema = z.object({
   objectType: z.enum(["Request", "Bird", "PaymentInstruction"]),
   objectId: z.string(),
   actionType: z.enum(["PAYMENT_VERIFY_HIGH_VALUE", "PAYMENT_INSTRUCTION_HIGH_VALUE", "REQUEST_CANCEL_AFTER_PAID", "BIRD_DELETE"]),
-  proposedChanges: z.record(z.unknown()),
+  proposedChanges: z.record(z.string(), z.unknown()),
   reason: z.string().max(500).optional(),
   thresholdValue: z.number().optional(),
 });

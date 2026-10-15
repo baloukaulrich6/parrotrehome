@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -22,6 +23,7 @@ import { BarChart7, StatusDonut } from "@/components/admin/charts";
 export const metadata = { title: "Admin dashboard" };
 
 export default async function AdminDashboardPage() {
+  await requireStaffPage();
   const user = await getServerUser();
   if (!user) return null;
 

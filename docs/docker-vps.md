@@ -53,11 +53,13 @@ Le script conserve les fichiers privés sous `/etc/parrotrehome/` avec droits ro
 
 ## Utilisation et mises à jour
 
+La gestion des comptes, le MFA obligatoire, les dernières connexions et la migration du journal sont décrits dans [staff-mfa.md](staff-mfa.md). Après le premier accès avec mot de passe, le personnel configure son authentificateur avant d’accéder à l’administration.
+
 - Site : `https://parrotrehome.com`
 - Administration : `https://parrotrehome.com/admin`
 - Au premier accès, ajouter les oiseaux et produits et renseigner les informations de paiement avant de les activer. Les photos et modèles de mails modifiés sont persistants.
 - Les mails restent **en mode aperçu** : le fournisseur d’envoi n’est pas encore connecté. Le script ne peut pas remplacer ce raccordement par des identifiants inventés.
-- La configuration Next.js existante ignore les erreurs TypeScript au build. Les 17 erreurs globales préexistantes restent documentées dans `docs/demo.md` ; un build réussi ne signifie pas que le contrôle TypeScript passe.
+- La configuration Next.js existante ignore les erreurs TypeScript au build. Les 12 erreurs globales préexistantes restantes restent documentées dans `docs/demo.md` ; un build réussi ne signifie pas que le contrôle TypeScript passe.
 
 Pour mettre à jour, transférer les nouveaux fichiers source dans ce même dossier puis relancer la même commande. Éviter d’extraire par-dessus un ancien projet contenant des fichiers supprimés : préférer un nouveau dossier source propre. Le nom Compose et les volumes restent identiques d’un dossier à l’autre.
 
@@ -74,6 +76,6 @@ Le build précède l’arrêt de l’application. Si l’initialisation échoue,
 
 ## Vérifications locales
 
-Les deux images Docker ont été construites. Les 11 tests applicatifs et de bootstrap passent, y compris dans l’image. La configuration Compose et celle de Caddy ont été validées. Un volume temporaire a servi à initialiser puis relancer la base : un seul administrateur est conservé et les zones de livraison ne sont pas dupliquées. Dans le conteneur applicatif non-root, l’API SQLite, la page d’accueil et une vraie connexion administrateur avec accès à `/admin` répondent correctement. La persistance des images a été contrôlée après redémarrage.
+Les deux images Docker ont été construites. Les 15 tests unitaires/de bootstrap, le test HTTP isolé (39 assertions) et le test Python de migration passent, y compris dans l’image. La configuration Compose et celle de Caddy ont été validées. Un volume temporaire a servi à initialiser puis relancer la base : un seul administrateur est conservé et les zones de livraison ne sont pas dupliquées. Dans le conteneur applicatif non-root, l’API SQLite, la page d’accueil et une vraie connexion administrateur avec accès à `/admin` répondent correctement. La persistance des images a été contrôlée après redémarrage.
 
 Ces tests n’ont exposé aucun port ni déployé l’application sur le VPS. L’installation APT sur votre machine, son DNS, l’émission du certificat public et le parcours complet du script sur votre VPS restent à exécuter. Dans l’environnement cloud de test, le build a utilisé le proxy fourni et son certificat de confiance via un secret BuildKit temporaire ; aucune vérification TLS n’a été désactivée et ce certificat n’est pas inclus dans l’image finale.

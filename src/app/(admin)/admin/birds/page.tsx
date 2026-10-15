@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { BIRD_STATUS_META, formatUsd, formatDateOnly } from "@/lib/constants";
@@ -16,6 +17,7 @@ export default async function AdminBirdsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
   const user = await getServerUser();
   const canManage = user ? can(user.role, "inventory:manage_birds") : false;

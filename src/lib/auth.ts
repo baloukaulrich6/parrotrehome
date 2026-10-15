@@ -1,3 +1,7 @@
+import { audit } from "./audit";
+import { verifyMfaTokenStep } from "./mfa";
+import { mfaKeyId, readMfaSecret } from "./mfa-storage";
+import { sessionAllowsAccess } from "./session-policy";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
@@ -10,7 +14,6 @@ import type { Role } from "@prisma/client";
 // roles, expiring sessions.
 // ============================================================
 
-const SESSION_MAX_AGE_STAFF = 60 * 60 * 8;     // 8 hours for staff
 const SESSION_MAX_AGE_CLIENT = 60 * 60 * 24 * 30; // 30 days for client
 
 declare module "next-auth" {
@@ -21,6 +24,9 @@ declare module "next-auth" {
       name?: string | null;
       role: Role;
       status: string;
+      authAt?: number;
+      mfaKeyId?: string;
+      mfaEnabled?: boolean;
     };
   }
   interface User {
@@ -29,6 +35,8 @@ declare module "next-auth" {
     name?: string | null;
     role: Role;
     status: string;
+    authAt?: number;
+    mfaKeyId?: string;
   }
 }
 
@@ -37,6 +45,8 @@ declare module "next-auth/jwt" {
     id: string;
     role: Role;
     status: string;
+    authAt?: number;
+    mfaKeyId?: string;
   }
 }
 
@@ -55,6 +65,7 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totp: { label: "Authenticator code", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -64,7 +75,35 @@ export const authOptions: NextAuthOptions = {
           if (!user) return null;
           if (user.status !== "ACTIVE") return null;
           const ok = await bcrypt.compare(credentials.password as string, user.passwordHash);
-          if (!ok) return null;
+          if (!ok) {
+            await audit({ actorId: user.id, actorRole: user.role, objectType: "User", objectId: user.id, action: "LOGIN_FAILED", metadata: { reason: "INVALID_CREDENTIALS" } });
+            return null;
+          }
+          let verifiedKey = "";
+          if (user.role !== "CLIENT" && user.mfaEnabled) {
+            if (!user.mfaSecret) return null;
+            const step = await verifyMfaTokenStep(credentials.totp || "", readMfaSecret(user.mfaSecret).secret);
+            if (step === null) {
+              await audit({ actorId: user.id, actorRole: user.role, objectType: "User", objectId: user.id, action: "LOGIN_FAILED", metadata: { reason: "INVALID_AUTHENTICATOR" } });
+              return null;
+            }
+            verifiedKey = mfaKeyId(user.mfaSecret);
+            // Unique server-side claim prevents reuse of the same authenticator code.
+            await db.sessionToken.deleteMany({ where: { token: { startsWith: "mfa:" }, expiresAt: { lt: new Date() } } });
+            try {
+              await db.sessionToken.create({ data: { userId: user.id,
+                token: `mfa:${mfaKeyId(`${user.id}:${verifiedKey}:${step}`)}`,
+                expiresAt: new Date((step + 3) * 30_000),
+              } });
+            } catch (error) {
+              if ((error as { code?: string }).code === "P2002") {
+                await audit({ actorId: user.id, actorRole: user.role, objectType: "User", objectId: user.id, action: "LOGIN_FAILED", metadata: { reason: "AUTHENTICATOR_CODE_ALREADY_USED" } });
+                return null;
+              }
+              throw error;
+            }
+          }
+          await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
           // Audit login (non-blocking — wrapped to avoid auth failure)
           try {
             await db.auditLog.create({
@@ -74,6 +113,7 @@ export const authOptions: NextAuthOptions = {
                 objectType: "User",
                 objectId: user.id,
                 action: "LOGIN",
+                metadata: JSON.stringify({ mfaVerified: !!verifiedKey, setupRequired: user.role !== "CLIENT" && !user.mfaEnabled }),
                 timestamp: new Date(),
               },
             });
@@ -86,6 +126,8 @@ export const authOptions: NextAuthOptions = {
             name: user.name ?? undefined,
             role: user.role,
             status: user.status,
+            authAt: Date.now(),
+            mfaKeyId: verifiedKey,
           };
         } catch (err) {
           console.error("[auth] authorize error:", err);
@@ -100,6 +142,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id as string;
         token.role = (user.role as Role) ?? "CLIENT";
         token.status = user.status as string;
+        token.authAt = user.authAt;
+        token.mfaKeyId = user.mfaKeyId;
       }
       return token;
     },
@@ -108,6 +152,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.status = token.status;
+        session.user.authAt = token.authAt;
+        session.user.mfaKeyId = token.mfaKeyId;
       }
       return session;
     },
@@ -115,23 +161,16 @@ export const authOptions: NextAuthOptions = {
 };
 
 // Server-side helper to fetch the current user with role
-export async function getServerUser(): Promise<{
-  id: string;
-  email: string;
-  name: string | null;
-  role: Role;
-  status: string;
-} | null> {
+export async function getServerUser(options: { allowMfaSetup?: boolean } = {}) {
   const { getServerSession } = await import("next-auth");
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
-  return {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name ?? null,
-    role: session.user.role,
-    status: session.user.status,
-  };
+  const user = await db.user.findUnique({ where: { id: session.user.id }, select: {
+    id: true, email: true, name: true, role: true, status: true, mfaEnabled: true, mfaSecret: true,
+  } });
+  if (!user || !sessionAllowsAccess(user, session.user, user.mfaSecret ? mfaKeyId(user.mfaSecret) : "", options.allowMfaSetup)) return null;
+  // Do not return stored authenticator secrets to callers or client components.
+  return { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status, mfaEnabled: user.mfaEnabled };
 }
 
 // Hash helper for new accounts (sign-up) — uses bcrypt with cost 10

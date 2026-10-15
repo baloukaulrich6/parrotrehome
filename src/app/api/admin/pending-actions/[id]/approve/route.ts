@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
-import { auditLog } from "@/lib/audit";
+import { auditLog, audit } from "@/lib/audit";
 import { canTransition } from "@/lib/constants";
 
 // POST /api/admin/pending-actions/[id]/approve

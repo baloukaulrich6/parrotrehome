@@ -52,11 +52,11 @@ export default async function RequestDetailPage({
       messages: { where: { channel: "EMAIL" }, orderBy: { sentAt: "asc" } },
       paymentInstructions: { orderBy: { createdAt: "desc" } },
       paymentChecks: { include: { verifier: { select: { name: true } } }, orderBy: { verifiedAt: "desc" } },
-      auditLogs: { orderBy: { timestamp: "asc" } },
     },
   });
 
   if (!request) return notFound();
+  const auditLogs = await db.auditLog.findMany({ where: { objectType: "Request", objectId: id }, orderBy: { timestamp: "asc" } });
 
   // T-05: server-side ownership check.
   // CLIENT can view if: customerId matches their user ID, OR if the request's
@@ -81,7 +81,7 @@ export default async function RequestDetailPage({
   );
 
   // Build timeline from audit logs
-  const timeline = request.auditLogs
+  const timeline = auditLogs
     .filter((l) => l.objectType === "Request" || l.objectId === request.id)
     .slice()
     .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());

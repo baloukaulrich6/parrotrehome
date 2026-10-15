@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import {
@@ -22,6 +23,7 @@ export default async function AdminRequestsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
   const where: Record<string, unknown> = {};
   if (sp.status) where.status = sp.status;

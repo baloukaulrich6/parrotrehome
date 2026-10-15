@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatDateUTC } from "@/lib/constants";
@@ -12,14 +13,9 @@ export default async function AdminCustomersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
   const where = { role: "CLIENT" as const };
-  if (sp.q) {
-    where.OR = [
-      { email: { contains: sp.q } },
-      { name: { contains: sp.q } },
-    ];
-  }
   // SQLite doesn't support typed where with OR on enum filter; use raw where
   const users = await db.user.findMany({
     where: sp.q

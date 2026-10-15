@@ -274,7 +274,6 @@ model Request {
   messages        Message[]
   comments        InternalComment[]
   chatMessages    ChatMessage[]   // F-28 secure client-agent messaging
-  auditLogs       AuditLog[]
 
   @@index([status])
   @@index([customerId])
@@ -443,7 +442,8 @@ model AuditLog {
 
   actor       User?        @relation(fields: [actorId], references: [id])
 
-  request     Request?     @relation(fields: [objectId], references: [id], onDelete: NoAction)
+  // Polymorphic objectId may identify a User, Bird, Product, Request, etc.
+  // It must not be constrained to Request.id. Request timelines query it explicitly.
 
   @@index([actorId])
   @@index([objectType, objectId])

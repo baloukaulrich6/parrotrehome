@@ -7,3 +7,5 @@ next-env.d.ts
 dev.log
 server.log
 var/
+__pycache__/
+*.py[cod]

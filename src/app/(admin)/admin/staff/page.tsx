@@ -1,3 +1,7 @@
+import { StaffAccountForm } from "@/components/admin/staff-account-form";
+import { canManageAccount } from "@/lib/user-management";
+import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -14,6 +18,7 @@ export default async function AdminStaffPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
   const user = await getServerUser();
   if (!user) return null;
@@ -36,7 +41,7 @@ export default async function AdminStaffPage({
   const where: Record<string, unknown> = {
     role: { not: "CLIENT" },
   };
-  if (sp.role) where.role = sp.role;
+  if (sp.role && ["SUPER_ADMIN", "MANAGER", "AGENT", "STOCK_MANAGER", "AVIAN_PROFESSIONAL"].includes(sp.role)) where.role = sp.role;
   if (sp.q) {
     where.OR = [
       { email: { contains: sp.q } },
@@ -45,20 +50,24 @@ export default async function AdminStaffPage({
   }
   const staff = await db.user.findMany({
     where,
-    orderBy: { role: "asc" },
+    orderBy: [{ role: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, email: true, role: true, status: true, mfaEnabled: true, lastLoginAt: true },
   });
 
   return (
     <div className="space-y-5">
+      <LiveRequestRefresh />
       <div>
         <p className="eyebrow mb-1">Team</p>
         <h1 className="font-heading text-slate text-[26px] lg:text-[32px] font-bold">
           Staff directory
         </h1>
         <p className="text-feather text-[14px] font-body mt-1">
-          {staff.length} staff member{staff.length !== 1 ? "s" : ""} · MFA-enforced for staff per Cahier p.09
+          {staff.length} staff member{staff.length !== 1 ? "s" : ""} · Authenticator required for administrative access
         </p>
       </div>
+
+      <div className="flex items-center gap-4"><StaffAccountForm managerOnly={user.role === "MANAGER"} /><Link href="/account" className="text-sm text-forest underline">My account &amp; sign-ins</Link><Link href="/admin/audit?action=LOGIN" className="text-sm text-forest underline">Sign-in history</Link></div>
 
       <form method="get" className="bg-white rounded-xl border border-feather/20 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
         <div className="flex-1">
@@ -94,7 +103,8 @@ export default async function AdminStaffPage({
                 <th className="text-left px-4 py-3 font-semibold">Role</th>
                 <th className="text-left px-4 py-3 font-semibold">MFA</th>
                 <th className="text-left px-4 py-3 font-semibold">Status</th>
-                <th className="text-left px-4 py-3 font-semibold">Last login</th>
+                <th className="text-left px-4 py-3 font-semibold">Last sign-in (UTC)</th>
+                <th className="text-left px-4 py-3 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-feather/10">
@@ -123,8 +133,9 @@ export default async function AdminStaffPage({
                     <span className="ml-2 text-slate text-[12px]">{s.status.replace(/_/g, " ").toLowerCase()}</span>
                   </td>
                   <td className="px-4 py-3 text-feather text-[12px]">
-                    {s.lastLoginAt ? formatDateUTC(s.lastLoginAt).split(",")[0] : "Never"}
+                    {s.lastLoginAt ? formatDateUTC(s.lastLoginAt) : "No recorded sign-in"}
                   </td>
+                  <td className="px-4 py-3">{canManageAccount(user.role, s.role, s.role) && <StaffAccountForm account={s} managerOnly={user.role === "MANAGER"} />}</td>
                 </tr>
               ))}
             </tbody>
@@ -133,9 +144,8 @@ export default async function AdminStaffPage({
       </div>
 
       <div className="bg-tail-red/5 border border-tail-red/20 rounded-xl p-4 text-[13px] font-body text-slate">
-        <strong>Security note:</strong> Staff accounts should enable MFA via the
-        &ldquo;Set up MFA&rdquo; button in the sidebar user panel. This is a
-        documented requirement (Cahier p.09) for all roles except clients.
+        <strong>Security note:</strong> Staff must enable MFA via the
+        &ldquo;Set up MFA&rdquo; button in My account. A pending account can access only MFA setup until enrollment is complete.
       </div>
     </div>
   );

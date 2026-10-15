@@ -1,3 +1,8 @@
+import { getServerUser } from "@/lib/auth";
+import { can } from "@/lib/rbac";
+import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
+import { AuditAction, type Prisma } from "@prisma/client";
+import { requireStaffPage } from "@/lib/staff-page";
 import { db } from "@/lib/db";
 import { formatDateUTC } from "@/lib/constants";
 import { History, Filter } from "lucide-react";
@@ -11,12 +16,22 @@ export default async function AdminAuditPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
-  const where: Record<string, unknown> = {};
-  if (sp.action) where.action = sp.action;
+  const viewer = await getServerUser();
+  if (!viewer || !can(viewer.role, "audit:view")) return <p>Access restricted. Your own sign-in history is available in My account.</p>;
+  const where: Prisma.AuditLogWhereInput = {};
+  if (sp.action && Object.values(AuditAction).includes(sp.action as AuditAction)) where.action = sp.action as AuditAction;
   if (sp.objectType) where.objectType = sp.objectType;
 
-  const page = parseInt(sp.page ?? "1", 10);
+  if (sp.q?.trim()) where.OR = [
+    { objectId: { contains: sp.q.trim() } },
+    { actor: { email: { contains: sp.q.trim() } } },
+    { actor: { name: { contains: sp.q.trim() } } },
+    { changes: { contains: sp.q.trim() } },
+    { metadata: { contains: sp.q.trim() } },
+  ];
+  const page = Math.max(1, Math.min(1000000, Number.parseInt(sp.page || "1", 10) || 1));
   const pageSize = 50;
   const [logs, total] = await Promise.all([
     db.auditLog.findMany({
@@ -34,18 +49,20 @@ export default async function AdminAuditPage({
 
   return (
     <div className="space-y-5">
+      <LiveRequestRefresh />
       <div>
         <p className="eyebrow mb-1">Compliance</p>
         <h1 className="font-heading text-slate text-[26px] lg:text-[32px] font-bold flex items-center gap-2">
           <History className="h-6 w-6 text-feather" aria-hidden /> Audit log
         </h1>
         <p className="text-feather text-[14px] font-body mt-1">
-          Immutable history of every modification and send (A-11).
+          Recorded sign-ins, account changes and operational actions. Times are shown in UTC.
           {total} entr{total === 1 ? "y" : "ies"} · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
         </p>
       </div>
 
       <form method="get" className="bg-white rounded-xl border border-feather/20 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+        <label className="text-xs text-feather">Search actor, object or details<input name="q" defaultValue={sp.q} className="block mt-1 p-3 border rounded-md text-slate" placeholder="Email, name, object or action detail" /></label>
         <div>
           <label htmlFor="action" className="text-[12px] font-body font-semibold text-feather uppercase tracking-wide">Action</label>
           <select id="action" name="action" defaultValue={sp.action ?? ""} className="mt-1 h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring">
@@ -94,6 +111,7 @@ export default async function AdminAuditPage({
                     {log.actor ? (
                       <>
                         <p className="font-semibold">{log.actor.name}</p>
+                        <p className="text-xs">{log.actor.email}</p>
                         <p className="text-feather text-[11px]">{log.actorRole}</p>
                       </>
                     ) : (

@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -44,6 +45,7 @@ export default async function DossierPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const user = await getServerUser();
   if (!user || !isAdminRole(user.role)) {
@@ -58,7 +60,6 @@ export default async function DossierPage({
       messages: { orderBy: { sentAt: "asc" } },
       paymentInstructions: { orderBy: { createdAt: "desc" } },
       paymentChecks: { orderBy: { verifiedAt: "desc" }, include: { verifier: true } },
-      auditLogs: { orderBy: { timestamp: "asc" } },
       comments: { orderBy: { createdAt: "asc" }, include: { user: true } },
       selectedPaymentMethod: true,
       customer: true,
@@ -67,6 +68,7 @@ export default async function DossierPage({
   });
 
   if (!request) return notFound();
+  const auditLogs = await db.auditLog.findMany({ where: { objectType: "Request", objectId: id }, orderBy: { timestamp: "asc" } });
 
   // RBAC: agents only see assigned requests (T-05)
   if (user.role === "AGENT" && request.agentId !== user.id) {
@@ -314,10 +316,10 @@ export default async function DossierPage({
             </div>
             <div className="px-5 py-4">
               <ol className="space-y-3">
-                {request.auditLogs.length === 0 ? (
+                {auditLogs.length === 0 ? (
                   <p className="text-feather text-[13px] font-body italic">No history yet.</p>
                 ) : (
-                  request.auditLogs.map((log) => (
+                  auditLogs.map((log) => (
                     <li key={log.id} className="flex gap-3 text-[13px] font-body">
                       <span className="flex-shrink-0 inline-flex h-2 w-2 mt-1.5 rounded-full bg-tail-red" aria-hidden />
                       <div className="flex-1">

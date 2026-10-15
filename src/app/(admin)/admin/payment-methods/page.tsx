@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { PaymentMethodEditor } from "@/components/admin/payment-method-editor";
@@ -7,6 +8,7 @@ import { PaymentMethodToggle } from "@/components/admin/payment-method-toggle";
 export const metadata = { title: "Payment methods — Admin" };
 
 export default async function AdminPaymentMethodsPage() {
+  await requireStaffPage();
   const user = await getServerUser();
   const canConfigure = !!user && can(user.role, "payment:configure");
   const methods = await db.paymentMethod.findMany({

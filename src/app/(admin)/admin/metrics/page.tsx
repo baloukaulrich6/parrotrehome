@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import { db } from "@/lib/db";
 import { formatUsd, formatDateUTC, REQUEST_STATUS_META } from "@/lib/constants";
 import { BarChart7 } from "@/components/admin/charts";
@@ -8,6 +9,7 @@ import { TrendingUp, BarChart3, DollarSign, Clock } from "lucide-react";
 export const metadata = { title: "Metrics — Admin" };
 
 export default async function AdminMetricsPage() {
+  await requireStaffPage();
   // Total stats
   const total = await db.request.count();
   const completed = await db.request.count({ where: { status: "COMPLETED" } });

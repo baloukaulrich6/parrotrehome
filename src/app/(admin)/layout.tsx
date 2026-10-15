@@ -1,8 +1,6 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getServerUser } from "@/lib/auth";
-import { isAdminRole } from "@/lib/rbac";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -28,6 +26,7 @@ import { MfaSettingsDialog } from "@/components/admin/mfa-settings-dialog";
 export const metadata = { title: "Admin console" };
 
 const NAV = [
+  { href: "/account", label: "My account", icon: Users },
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/pending-actions", label: "Pending approvals", icon: AlertCircle },
   { href: "/admin/requests", label: "Requests", icon: ClipboardList },
@@ -51,10 +50,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getServerUser();
-  if (!user || !isAdminRole(user.role)) {
-    redirect("/sign-in?callbackUrl=/admin");
-  }
+  const user = await requireStaffPage();
 
   // Fetch full user record for MFA flag (getServerUser doesn't return it)
   const userFull = await db.user.findUnique({
@@ -164,6 +160,7 @@ export default async function AdminLayout({
                 {item.label}
               </Link>
             ))}
+            <div className="p-3"><MfaSettingsDialog mfaEnabled={user.mfaEnabled} email={user.email} /></div>
           </nav>
         </details>
       </div>

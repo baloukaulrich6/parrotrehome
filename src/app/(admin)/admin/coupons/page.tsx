@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
@@ -9,6 +10,7 @@ import Link from "next/link";
 export const metadata = { title: "Coupons — Admin" };
 
 export default async function AdminCouponsPage() {
+  await requireStaffPage();
   const user = await getServerUser();
   if (!user) return null;
   if (!can(user.role, "cms:manage")) {

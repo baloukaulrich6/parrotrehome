@@ -1,3 +1,4 @@
+import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatDateUTC, formatUsd, AVIAN_ADVICE_PRICE_PER_HOUR } from "@/lib/constants";
@@ -7,6 +8,7 @@ import { SendRemindersButton } from "@/components/admin/send-reminders-button";
 export const metadata = { title: "Appointments — Admin" };
 
 export default async function AdminAppointmentsPage() {
+  await requireStaffPage();
   const appts = await db.appointment.findMany({
     orderBy: { slotStartUtc: "asc" },
     include: { professional: true, customer: true, request: true },

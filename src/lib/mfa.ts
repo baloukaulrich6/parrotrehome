@@ -1,5 +1,4 @@
 import {
-  TOTP,
   generateSecret,
   generateURI,
   generate as generateTotp,
@@ -17,9 +16,6 @@ import QRCode from "qrcode";
 const ISSUER = "ParrotRehome";
 const PERIOD = 30;
 const DIGITS = 6;
-
-// Optional strategy instance for type-safe config (kept for future extension)
-const _totp = new TOTP({ digits: DIGITS, period: PERIOD });
 
 export function generateMfaSecret(): string {
   return generateSecret({ length: 20 });
@@ -45,22 +41,17 @@ export async function generateQrCodeDataUrl(email: string, secret: string): Prom
   });
 }
 
-export async function verifyMfaToken(token: string, secret: string): Promise<boolean> {
+export async function verifyMfaTokenStep(token: string, secret: string): Promise<number | null> {
   try {
     const clean = token.replace(/\s/g, "");
-    if (clean.length !== DIGITS) return false;
-    const result = await verifyTotp({
-      token: clean,
-      secret,
-      digits: DIGITS,
-      period: PERIOD,
-      epochTolerance: 1, // ±30s window
-    });
-    // otplib v13 verify returns { valid, delta, epoch, timeStep } | null
-    return Boolean(result && (result as { valid?: boolean }).valid);
-  } catch {
-    return false;
-  }
+    if (!/^\d{6}$/.test(clean)) return null;
+    const result = await verifyTotp({ token: clean, secret, digits: DIGITS, period: PERIOD, epochTolerance: 30 });
+    return result.valid && "timeStep" in result && typeof result.timeStep === "number" ? result.timeStep : null;
+  } catch { return null; }
+}
+
+export async function verifyMfaToken(token: string, secret: string): Promise<boolean> {
+  return (await verifyMfaTokenStep(token, secret)) !== null;
 }
 
 export async function generateCurrentTotp(secret: string): Promise<string> {

@@ -1,228 +1,41 @@
 "use client";
-
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, QrCode, Check, X } from "lucide-react";
+import { Shield, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
-interface MfaState {
-  mfaEnabled: boolean;
-  email: string;
-}
-
-export function MfaSettingsDialog({ mfaEnabled, email }: MfaState) {
-  const router = useRouter();
+export function MfaSettingsDialog({ mfaEnabled, email }: { mfaEnabled: boolean; email: string }) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"idle" | "init" | "verify" | "confirm-disable">("idle");
   const [secret, setSecret] = useState("");
   const [qr, setQr] = useState("");
-  const [uri, setUri] = useState("");
   const [token, setToken] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function startSetup() {
-    setSubmitting(true);
+  const [busy, setBusy] = useState(false);
+  async function act(action: "init" | "verify") {
+    setBusy(true);
     try {
-      const res = await fetch("/api/mfa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "init" }),
-      });
+      const res = await fetch("/api/mfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, token }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setSecret(data.secret);
-      setQr(data.qr);
-      setUri(data.uri);
-      setStep("verify");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setSubmitting(false);
-    }
+      if (!res.ok) throw new Error(data.error || "MFA setup failed");
+      if (action === "init") { setSecret(data.secret); setQr(data.qr); setToken(""); }
+      else {
+        toast.success("MFA enabled. Sign in with your password and authenticator code.");
+        setSecret(""); setQr(""); setToken("");
+        await signOut({ callbackUrl: "/sign-in?mfa=enabled" });
+      }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "MFA setup failed"); }
+    finally { setBusy(false); }
   }
-
-  async function verify() {
-    if (!token || token.length < 6) {
-      toast.error("Please enter the 6-digit code from your authenticator app.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/mfa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", token, secret }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      toast.success("MFA enabled. You'll need a TOTP code on next sign-in.");
-      setOpen(false);
-      setStep("idle");
-      setToken("");
-      setSecret("");
-      setQr("");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function disable() {
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/mfa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "disable" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      toast.success("MFA disabled.");
-      setOpen(false);
-      setStep("idle");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function openDialog(opened: boolean) {
-    setOpen(opened);
-    if (opened) {
-      setStep(mfaEnabled ? "confirm-disable" : "idle");
-    } else {
-      setStep("idle");
-      setToken("");
-      setSecret("");
-      setQr("");
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={openDialog}>
-      <DialogTrigger asChild>
-        <button className="inline-flex items-center justify-center gap-1.5 h-8 px-2 rounded-md bg-[var(--sidebar-accent)] hover:bg-iris/20 text-ivory/85 hover:text-ivory text-[12px] font-body font-medium transition-colors">
-          <Shield className="h-3.5 w-3.5" aria-hidden /> {mfaEnabled ? "MFA on" : "Set up MFA"}
-        </button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-heading text-slate flex items-center gap-2">
-            <Shield className="h-4 w-4 text-forest" aria-hidden /> Multi-factor authentication
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Idle state — choose action */}
-        {step === "idle" && (
-          <div className="space-y-4">
-            <p className="text-[14px] font-body text-slate">
-              Per ParrotRehome security policy, staff accounts must enable MFA (Cahier p.09).
-              MFA adds a one-time code (RFC 6238 TOTP) required at every sign-in,
-              generated by an authenticator app like Google Authenticator, Authy, or 1Password.
-            </p>
-            <div className="bg-forest/5 border border-forest/20 rounded-md p-3 text-[12px] font-body text-slate">
-              <strong>How it works:</strong> install an authenticator app on your phone, scan the QR code, enter the 6-digit code to confirm, and MFA is enabled. Each future sign-in will require both your password and a fresh TOTP code.
-            </div>
-            <button
-              type="button"
-              onClick={startSetup}
-              disabled={submitting}
-              className="w-full h-10 rounded-md bg-forest hover:bg-forest-dark text-white text-[14px] font-body font-semibold inline-flex items-center justify-center gap-2 disabled:bg-feather/40"
-            >
-              <QrCode className="h-4 w-4" /> Generate QR code
-            </button>
-          </div>
-        )}
-
-        {/* Verify state — show QR + ask for TOTP */}
-        {step === "verify" && (
-          <div className="space-y-4">
-            <p className="text-[14px] font-body text-slate">
-              Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
-            </p>
-            <div className="flex flex-col items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt="MFA QR code" className="w-60 h-60 rounded-md border border-feather/30" />
-              <details className="w-full">
-                <summary className="text-[12px] font-body text-feather cursor-pointer">Manual entry key</summary>
-                <code className="block mt-1 p-2 bg-ivory rounded text-[11px] font-mono text-slate break-all">{secret}</code>
-                <p className="text-[11px] font-body text-feather mt-1">URI: <code className="break-all">{uri}</code></p>
-              </details>
-            </div>
-            <div>
-              <label htmlFor="mfa-token" className="text-[11px] font-body font-semibold text-feather uppercase tracking-wide">
-                6-digit code from your app
-              </label>
-              <input
-                id="mfa-token"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9 ]*"
-                maxLength={7}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="123 456"
-                className="mt-1 w-full h-11 px-3 rounded-md border border-feather/30 bg-ivory text-[16px] font-mono tracking-widest text-center focus-ring"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setStep("idle")}
-                className="flex-1 h-10 rounded-md border border-feather/30 hover:bg-feather/10 text-slate text-[13px] font-body font-semibold"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={verify}
-                disabled={submitting || token.length < 6}
-                className="flex-1 h-10 rounded-md bg-forest hover:bg-forest-dark text-white text-[13px] font-body font-semibold inline-flex items-center justify-center gap-2 disabled:bg-feather/40"
-              >
-                {submitting ? "Verifying..." : <><Check className="h-4 w-4" /> Verify &amp; enable</>}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Confirm-disable state — for users with MFA enabled */}
-        {step === "confirm-disable" && (
-          <div className="space-y-4">
-            <div className="bg-forest/5 border border-forest/30 rounded-md p-3 flex items-center gap-2">
-              <Shield className="h-5 w-5 text-forest" aria-hidden />
-              <p className="text-[14px] font-body text-slate">
-                <strong>MFA is currently enabled</strong> for {email}.
-              </p>
-            </div>
-            <p className="text-[13px] font-body text-feather">
-              Disabling MFA removes the additional sign-in protection.
-              We strongly recommend keeping MFA enabled for staff accounts.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="h-10 px-4 rounded-md border border-feather/30 hover:bg-feather/10 text-slate text-[13px] font-body font-semibold"
-              >
-                Keep MFA enabled
-              </button>
-              <button
-                type="button"
-                onClick={disable}
-                disabled={submitting}
-                className="h-10 px-4 rounded-md bg-tail-red hover:bg-tail-red-dark text-white text-[13px] font-body font-semibold inline-flex items-center gap-2 disabled:bg-feather/40"
-              >
-                <X className="h-4 w-4" /> Disable MFA
-              </button>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
+  return <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value) { setSecret(""); setQr(""); setToken(""); } }}>
+    <DialogTrigger asChild><button className="inline-flex items-center gap-2 rounded-md border border-forest/40 bg-ivory px-3 py-2 text-sm text-forest"><Shield className="h-4 w-4" />{mfaEnabled ? "MFA enabled" : "Set up MFA"}</button></DialogTrigger>
+    <DialogContent><DialogHeader><DialogTitle>Authenticator protection</DialogTitle></DialogHeader>
+      {mfaEnabled ? <div className="space-y-3"><p>MFA is active for {email}. Your password and authenticator code are required at sign-in.</p><p className="text-sm text-feather">If you lose your device, contact your server administrator for account recovery. MFA cannot be disabled from this session.</p></div> : <div className="space-y-4">
+        <p className="text-sm">Install Google Authenticator, Microsoft Authenticator or 2FAS. Scan your personal QR code, then enter its 6-digit code. Setup expires after 10 minutes.</p>
+        {qr && <><img src={qr} alt="Personal authenticator QR code" className="h-60 w-60 mx-auto" /><details><summary>Manual entry key</summary><code className="break-all text-sm">{secret}</code></details>
+          <label className="block text-sm">Authenticator code<input autoComplete="one-time-code" inputMode="numeric" maxLength={6} value={token} onChange={(e) => setToken(e.target.value.replace(/\D/g, ""))} className="block w-full border rounded-lg p-3 mt-1 tracking-widest" /></label>
+          <button disabled={busy || token.length !== 6} onClick={() => act("verify")} className="w-full bg-forest text-white rounded-full p-3 disabled:opacity-50">Verify and enable MFA</button></>}
+        <button disabled={busy} onClick={() => act("init")} className="inline-flex items-center gap-2 border border-forest rounded-full p-3 text-forest disabled:opacity-50"><QrCode className="h-4 w-4" />{busy ? "Please wait…" : qr ? "Generate a new QR code" : "Generate QR code"}</button>
+      </div>}
+    </DialogContent>
+  </Dialog>;
 }

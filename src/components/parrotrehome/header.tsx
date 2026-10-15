@@ -69,7 +69,7 @@ export function ParrotRehomeHeader() {
                 <span>Avian Advice: ${AVIAN_ADVICE_PRICE_PER_HOUR}/hour</span>
               </Link>
               <Link
-                href={session ? "/my-requests" : "/sign-in"}
+                href={session ? "/account" : "/sign-in"}
                 className="inline-flex items-center gap-1.5 hover:text-iris transition-colors touch-target px-1"
               >
                 <User className="h-3.5 w-3.5" aria-hidden />
@@ -170,7 +170,7 @@ export function ParrotRehomeHeader() {
                 )}
               </Link>
               <Link
-                href={session ? "/my-requests" : "/sign-in"}
+                href={session ? "/account" : "/sign-in"}
                 className="hidden sm:inline-flex items-center gap-2 h-11 px-5 rounded-full bg-tail-red hover:bg-tail-red-dark text-white text-[14px] font-body font-semibold transition-colors focus-ring shadow-sm"
               >
                 <ClipboardList className="h-4 w-4" aria-hidden />
@@ -216,7 +216,7 @@ export function ParrotRehomeHeader() {
                 </Link>
               ))}
               <Link
-                href={session ? "/my-requests" : "/sign-in"}
+                href={session ? "/account" : "/sign-in"}
                 onClick={() => setMobileOpen(false)}
                 className="mt-2 inline-flex w-full items-center justify-center gap-2 h-12 rounded-full bg-tail-red text-white font-semibold"
               >

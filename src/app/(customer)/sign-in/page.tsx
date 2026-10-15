@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
@@ -12,10 +12,11 @@ import { toast } from "sonner";
 function SignInContent() {
   const router = useRouter();
   const sp = useSearchParams();
-  const callbackUrl = sp.get("callbackUrl") || "/";
+  const callbackUrl = sp.get("callbackUrl");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,14 +27,21 @@ function SignInContent() {
       const res = await signIn("credentials", {
         email,
         password,
+        totp,
         redirect: false,
       });
       if (!res || res.error) {
-        toast.error("Invalid email or password.");
+        toast.error("Check your email, password and authenticator code. If a code was just used, wait for the next one.");
         return;
       }
       toast.success("Signed in.");
-      router.push(callbackUrl);
+      const session = await getSession();
+      if (session?.user?.role && session.user.role !== "CLIENT" && !session.user.mfaKeyId) {
+        router.push("/staff-mfa"); router.refresh(); return;
+      }
+      const fallback = session?.user?.role === "CLIENT" ? "/my-requests" : "/admin";
+      const destination = new URL(callbackUrl || fallback, window.location.origin);
+      router.push(destination.origin === window.location.origin ? destination.pathname + destination.search : fallback);
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -97,6 +105,9 @@ function SignInContent() {
                 </button>
               </div>
             </div>
+            <label className="block text-sm text-feather">Authenticator code (if enabled)
+              <input value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, ""))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit code" className="block w-full h-11 px-3 mt-1 border border-feather/30 rounded-md bg-ivory text-slate tracking-widest" />
+            </label>
             <button
               type="submit"
               disabled={submitting}
@@ -115,18 +126,6 @@ function SignInContent() {
           </p>
         </div>
 
-        {/* Demo accounts helper — clearly illustrative */}
-        <div className="mt-5 bg-slate/5 border border-slate/15 rounded-xl p-4 text-[12px] font-body text-slate">
-          <p className="font-semibold mb-2">Demo accounts (password: <code className="bg-ivory px-1 rounded">parrotrehome123</code>)</p>
-          <ul className="space-y-1 text-feather">
-            <li>• <code>admin@parrotrehome.com</code> — Super admin</li>
-            <li>• <code>manager@parrotrehome.com</code> — Manager</li>
-            <li>• <code>agent@parrotrehome.com</code> — Agent</li>
-            <li>• <code>stock@parrotrehome.com</code> — Stock manager</li>
-            <li>• <code>vet@parrotrehome.com</code> — Avian professional</li>
-            <li>• <code>client@example.com</code> — Client</li>
-          </ul>
-        </div>
       </div>
     </div>
   );
