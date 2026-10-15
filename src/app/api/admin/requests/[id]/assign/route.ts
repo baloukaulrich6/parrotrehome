@@ -43,7 +43,7 @@ export async function POST(
     }
 
     const previousAgentId = request.agentId;
-    const newStatus = "PENDING_REVIEW";
+    const newStatus = request.selectedPaymentMethodId ? "AWAITING_INSTRUCTIONS" : "PENDING_REVIEW";
 
     if (request.status === "RECEIVED") {
       if (!canTransition("RECEIVED", newStatus)) {
@@ -53,7 +53,7 @@ export async function POST(
         where: { id },
         data: { agentId: parsed.data.agentId, status: newStatus, assignedAt: new Date() },
       });
-    } else if (request.status === "PENDING_REVIEW") {
+    } else if (["PENDING_REVIEW", "AWAITING_INSTRUCTIONS"].includes(request.status)) {
       await db.request.update({
         where: { id },
         data: { agentId: parsed.data.agentId },

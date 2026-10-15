@@ -1,11 +1,12 @@
 /// <reference types="bun-types" />
 import { afterEach, expect, test } from "bun:test";
-import { deliverEmail } from "../src/lib/email-transport";
+import { deliverEmail, customerReplyAddress } from "../src/lib/email-transport";
 const previous = { transport: process.env.MAIL_TRANSPORT, key: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM, reply: process.env.MAIL_REPLY_TO };
 const originalFetch = globalThis.fetch;
+const previousRouting = { MAIL_INBOUND_PROVIDER: process.env.MAIL_INBOUND_PROVIDER, MAIL_REPLY_DOMAIN: process.env.MAIL_REPLY_DOMAIN, NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET };
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  for (const [name, value] of Object.entries({ MAIL_TRANSPORT: previous.transport, RESEND_API_KEY: previous.key, MAIL_FROM: previous.from, MAIL_REPLY_TO: previous.reply })) {
+  for (const [name, value] of Object.entries({ ...previousRouting, MAIL_TRANSPORT: previous.transport, RESEND_API_KEY: previous.key, MAIL_FROM: previous.from, MAIL_REPLY_TO: previous.reply })) {
     if (value === undefined) delete process.env[name]; else process.env[name] = value;
   }
 });
@@ -40,4 +41,15 @@ test("missing key and provider rejection cannot be reported as sent", async () =
   process.env.RESEND_API_KEY = "test-key-never-real";
   globalThis.fetch = (async () => Response.json({ message: "Unauthorized" }, { status: 401 })) as unknown as typeof fetch;
   await expect(deliverEmail(payload, "event-2")).rejects.toThrow("HTTP 401");
+});
+
+test("external mailboxes never get signed addresses unless Resend receiving is explicitly enabled", () => {
+  process.env.MAIL_REPLY_DOMAIN = "parrotrehome.com";
+  delete process.env.MAIL_INBOUND_PROVIDER;
+  expect(customerReplyAddress("request", "request-123")).toBeUndefined();
+  process.env.MAIL_INBOUND_PROVIDER = "mailbox";
+  expect(customerReplyAddress("inbox", "thread-123")).toBeUndefined();
+  process.env.MAIL_INBOUND_PROVIDER = "resend";
+  process.env.NEXTAUTH_SECRET = "only-a-local-reply-routing-fixture";
+  expect(customerReplyAddress("request", "request-123")).toMatch(/^request\+request-123\.[a-f0-9]{20}@parrotrehome\.com$/);
 });

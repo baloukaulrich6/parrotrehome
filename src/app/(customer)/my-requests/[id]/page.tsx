@@ -41,12 +41,14 @@ export default async function RequestDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const activeMethods = await db.paymentMethod.findMany({ where: { active: true }, orderBy: { displayOrder: "asc" }, select: { id: true, name: true, officialProvider: true } });
   const user = await getServerUser();
   if (!user) redirect(`/sign-in?callbackUrl=/my-requests/${id}`);
 
   const request = await db.request.findUnique({
     where: { id },
     include: {
+      selectedPaymentMethod: true,
       items: { include: { bird: true, product: true } },
       appointments: { include: { professional: true } },
       messages: { where: { channel: "EMAIL" }, orderBy: { sentAt: "asc" } },
@@ -315,9 +317,11 @@ export default async function RequestDetailPage({
             </div>
 
             {/* Payment method chooser — when status = PENDING_REVIEW (F-23) */}
-            {request.status === "PENDING_REVIEW" && (
-              <PaymentMethodChooser requestId={request.id} />
+            {["RECEIVED", "PENDING_REVIEW"].includes(request.status) && !request.selectedPaymentMethodId && (
+              <PaymentMethodChooser requestId={request.id} initialMethods={activeMethods} />
             )}
+
+            {request.selectedPaymentMethod && <div className="bg-white border border-feather/20 rounded-xl p-5"><p className="text-xs uppercase text-feather">Selected payment method</p><p className="font-semibold text-slate">{request.selectedPaymentMethod.name}</p><p className="text-sm text-feather mt-2">Your agent will email your payment instructions after review.</p></div>}
 
             {/* Secure instructions view — when status = INSTRUCTIONS_SENT or PAYMENT_TO_VERIFY */}
             {(request.status === "INSTRUCTIONS_SENT" || request.status === "PAYMENT_TO_VERIFY") && activeInstruction && (

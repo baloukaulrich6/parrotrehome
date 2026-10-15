@@ -30,6 +30,16 @@ export default function RequestPage() {
   const items = cart.items;
   const total = items.reduce((s, i) => s + i.priceUsd * i.qty, 0);
 
+  const [methods, setMethods] = useState<{ id: string; name: string }[]>([]);
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [paymentError, setPaymentError] = useState(false);
+  useEffect(() => {
+    fetch("/api/payment-methods", { cache: "no-store" }).then(async response => {
+      if (!response.ok) throw new Error("Unable to load payment methods");
+      const data = await response.json(); setMethods(data.methods || []);
+      if (data.methods?.length === 1) setPaymentMethodId(data.methods[0].id);
+    }).catch(() => setPaymentError(true));
+  }, []);
   const [states, setStates] = useState<ServedState[]>(DEFAULT_SERVED_STATES);
   useEffect(() => {
     fetch("/api/payment-methods?context=states")
@@ -96,6 +106,7 @@ export default function RequestPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          paymentMethodId: paymentMethodId || undefined,
           items: items.map((i) => ({
             type: i.type,
             refId: i.refId,
@@ -110,7 +121,7 @@ export default function RequestPage() {
           finalTotalUsd: couponPayload.finalTotalUsd,
           // A-26: channel attribution
           channel: typeof window !== "undefined" && window.innerWidth < 768 ? "mobile" : "web",
-          referrer: typeof document !== "undefined" ? document.referrer || null : null,
+          referrer: typeof document !== "undefined" ? document.referrer || undefined : undefined,
         }),
       });
       const data = await res.json();
@@ -121,7 +132,7 @@ export default function RequestPage() {
       trackConversion("request_submitted", { value: total, currency: "USD", transaction_id: data.reference });
       if (session?.user) {
         // Signed-in user → go directly to the request detail page
-        toast.success(`Request ${data.reference} received — check your email.`);
+        toast.success(data.emailStatus === "SENT" ? `Request ${data.reference} received — check your email.` : `Request ${data.reference} saved. View its progress in My Requests.`);
         router.push(`/my-requests/${data.requestId}`);
       } else {
         // Guest → go to the submitted confirmation page
@@ -253,6 +264,12 @@ export default function RequestPage() {
                   className="mt-1 w-full px-3 py-2 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring"
                 />
               </div>
+            </fieldset>
+
+            <fieldset className="bg-white rounded-xl border border-feather/20 p-6">
+              <legend className="px-2 text-sm font-semibold text-slate">3. Payment preference</legend>
+              <p className="text-sm text-feather mb-3">Choose an available method. Your agent will email the payment details after reviewing your request. No payment is taken now.</p>
+              {methods.length ? methods.map(method => <label key={method.id} className="flex items-center gap-3 p-3 border rounded-lg mb-2"><input type="radio" name="paymentMethodId" required value={method.id} checked={paymentMethodId === method.id} onChange={() => setPaymentMethodId(method.id)} /><span>{method.name}</span></label>) : <p role="status" className="text-sm text-feather">{paymentError ? "Unable to load payment methods. You can submit your request and contact our team." : "Our team will confirm the available payment options with you."}</p>}
             </fieldset>
 
             {/* Consent */}

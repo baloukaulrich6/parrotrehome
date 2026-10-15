@@ -141,6 +141,55 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-verified", deliveryStatus: "QUEUED" } })).toBe(1);
     expect((await runReminders()).status).toBe(200);
     expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-reminder" } })).toBe(1);
+    // Active methods are visible immediately and the selection survives checkout.
+    await db.servedState.create({ data: { code: "CA", name: "California", allowsBirdDelivery: true } });
+    const zelle = await db.paymentMethod.create({ data: { name: "ZELLE", officialProvider: "Zelle", active: true, instructionsTemplate: "Pay the reviewed amount for {{requestReference}} using the confirmed recipient details." } });
+    const inactive = await db.paymentMethod.create({ data: { name: "Hidden method", officialProvider: "Other", active: false, instructionsTemplate: "Not public" } });
+    const methodsResponse = await new Client().request("/api/payment-methods");
+    const methodList = (await methodsResponse.json()).methods;
+    expect(methodList.map((method: { name: string }) => method.name)).toContain("ZELLE");
+    expect(methodList.map((method: { name: string }) => method.name)).not.toContain("Hidden method");
+    expect(JSON.stringify(methodList)).not.toContain("instructionsTemplate");
+    const waiting = await db.request.create({ data: { reference: "EARLY-METHOD-001", type: "PARROT_PURCHASE", status: "RECEIVED", shippingState: "CA", customerName: "HTTP Client", customerEmail: "client@example.com" } });
+    const waitingHtml = await (await client.request(`/my-requests/${waiting.id}`)).text();
+    expect(waitingHtml).toContain("ZELLE");
+    expect((await client.request(`/api/requests/${waiting.id}/select-method`, { paymentMethodId: zelle.id }, "POST")).status).toBe(200);
+    expect((await db.request.findUniqueOrThrow({ where: { id: waiting.id } })).status).toBe("AWAITING_INSTRUCTIONS");
+    const orderBird = await db.bird.create({ data: { species: "African Grey", commonName: "Order Bird", photos: "[]", priceUsd: 900 } });
+    const order = { customerName: "HTTP Client", customerEmail: "client@example.com", customerPhone: "+1 555 000 1111", shippingState: "CA", shippingAddress: "12 Example Lane", experience: "Beginner", habitat: "Large bird room", preferences: "Please contact me in the afternoon", consent: true, paymentMethodId: zelle.id, items: [{ type: "BIRD", refId: orderBird.id, name: "Untrusted client name", qty: 1, priceUsd: 1 }] };
+    expect((await client.request("/api/requests", { ...order, paymentMethodId: inactive.id }, "POST")).status).toBe(400);
+    const submitted = await client.request("/api/requests", order, "POST");
+    expect(submitted.status).toBe(200);
+    const createdOrder = await submitted.json();
+    expect(createdOrder.emailStatus).toBe("QUEUED");
+    expect((await db.request.findUniqueOrThrow({ where: { id: createdOrder.requestId } })).selectedPaymentMethodId).toBe(zelle.id);
+    const acknowledgement = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "request-received" } });
+    expect(acknowledgement.body).toContain("ZELLE"); expect(acknowledgement.body).toContain("Order Bird"); expect(acknowledgement.body).toContain("900.00"); expect(acknowledgement.body).not.toContain("Untrusted client name");
+    const teamEmail = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "staff-order-received" } });
+    for (const value of [order.customerEmail, order.customerPhone, order.shippingAddress, order.habitat, order.preferences]) expect(teamEmail.body).toContain(value);
+    const adminOrderHtml = await (await admin.request(`/admin/requests/${createdOrder.requestId}`)).text();
+    expect(adminOrderHtml).toContain("Email instructions to customer");
+    const instructions = { body: "Zelle instructions reviewed for this request. Use the recipient supplied by your agent.", paymentMethodId: zelle.id };
+    expect((await client.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, instructions, "POST")).status).toBe(403);
+    expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, instructions, "POST")).status).toBe(200);
+    const paymentEmail = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "instructions-ready" } });
+    expect(paymentEmail.subject).toContain("ZELLE"); expect(paymentEmail.body).toContain("ZELLE");
+    expect((await db.request.findUniqueOrThrow({ where: { id: createdOrder.requestId } })).status).toBe("INSTRUCTIONS_SENT");
+    await db.paymentMethod.update({ where: { id: zelle.id }, data: { active: false } });
+    expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, instructions, "POST")).status).toBe(400);
+    // A password change always targets the signed-in account, and revokes old sessions.
+    expect((await new Client().request("/api/account/password", {}, "PUT")).status).toBe(401);
+    const newPassword = "New-local-password-only-12345";
+    expect((await client.request("/api/account/password", { currentPassword: password, newPassword, userId: initial.id }, "PUT")).status).toBe(400);
+    expect((await client.request("/api/account/password", { currentPassword: "wrong-password", newPassword }, "PUT")).status).toBe(400);
+    expect((await client.request("/api/account/password", { currentPassword: password, newPassword }, "PUT")).status).toBe(200);
+    expect((await client.request("/api/account/password", { currentPassword: newPassword, newPassword: password }, "PUT")).status).toBe(401);
+    expect((await admin.request("/admin/staff")).status).toBe(200);
+    expect(await bcrypt.compare(password, (await db.user.findUniqueOrThrow({ where: { id: initial.id } })).passwordHash)).toBe(true);
+    await stop(); await start();
+    expect((await (await login("client@example.com", password)).session()).user).toBeUndefined();
+    const changedClient = await login("client@example.com", newPassword);
+    expect((await changedClient.request("/account")).status).toBe(200);
   } finally {
     await stop(); await db.$disconnect(); closeSync(log); rmSync(temporary, { recursive: true, force: true });
   }

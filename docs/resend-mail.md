@@ -27,6 +27,7 @@ Le domaine vérifié pour l’envoi ne suffit pas : il faut aussi activer la ré
 
 ```dotenv
 MAIL_TRANSPORT=resend
+MAIL_INBOUND_PROVIDER=resend
 RESEND_API_KEY=REMPLACER_DANS_LE_FICHIER_SERVEUR
 MAIL_FROM=no-reply@parrotrehome.com
 MAIL_REPLY_TO=support@parrotrehome.com
@@ -96,3 +97,45 @@ Avec Resend recevant le domaine et cette interface, il est possible de recevoir 
 [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/) propose une redirection gratuite vers une boîte existante ; ce n’est pas une boîte hébergée avec SMTP. Cela peut servir si vous préférez lire vos messages dans une boîte personnelle, mais ne remplace pas le webhook de cette intégration.
 
 Pour de véritables boîtes séparées avec webmail, regarder notamment [Zoho Mail](https://www.zoho.com/mail/zohomail-pricing.html). Vérifier la disponibilité et les restrictions du forfait gratuit dans votre région ; aucune offre actuelle n’a pu être vérifiée depuis cet environnement. Éviter de gérer vous-même un serveur SMTP sur le VPS uniquement pour économiser une ou deux boîtes.
+
+## Réponses avec Zoho / Cloudflare et parcours de commande
+
+Par défaut, les réponses sont adressées à `MAIL_REPLY_TO`, une boîte existante. Pour une réception dans Zoho ou une redirection Cloudflare vers Outlook :
+
+```dotenv
+MAIL_TRANSPORT=resend
+MAIL_INBOUND_PROVIDER=mailbox
+MAIL_REPLY_TO=support@parrotrehome.com
+MAIL_REPLY_DOMAIN=
+MAIL_ORDER_NOTIFY=orders@parrotrehome.com
+```
+
+`orders@parrotrehome.com` et `support@parrotrehome.com` doivent réellement recevoir les messages chez le fournisseur choisi. Une vraie adresse d’équipe peut aussi être utilisée dans `MAIL_ORDER_NOTIFY`. Si cette variable est vide, les notifications de commande sont envoyées à `MAIL_REPLY_TO`. Elles contiennent les articles, le total calculé côté serveur, le moyen choisi, les coordonnées et les réponses au questionnaire.
+
+Les adresses signées `request+…` et `inbox+…` ne sont utilisées pour l’envoi que lorsque `MAIL_INBOUND_PROVIDER=resend` est explicitement configuré, avec un domaine de réception et un webhook opérationnels. Pour le parcours de réception Resend décrit plus haut, ajouter :
+
+```dotenv
+MAIL_INBOUND_PROVIDER=resend
+```
+
+Ne pas activer ce mode si le domaine est reçu seulement par Zoho ou par des règles Cloudflare limitées à `support` et `orders`. Ces règles ne reçoivent pas automatiquement toutes les adresses signées.
+
+Le choix du moyen actif est disponible dès le formulaire de commande, puis dans le dossier client au statut Reçue si aucun choix n’a encore été fait. Une seule méthode active est présélectionnée. Le moyen enregistré est affiché dans le dossier et dans l’accusé de réception. Les instructions confidentielles restent exclues du catalogue public des méthodes.
+
+Dans Administration → Requests → ouvrir le dossier → Actions → **Email payment instructions**, choisir une méthode active, vérifier les informations du destinataire et de paiement dans le texte, puis cliquer **Email instructions to customer**. Cette action est disponible dès la réception pour les rôles autorisés ; un agent reste limité à ses dossiers affectés. Le serveur refuse une méthode désactivée. L’email reprend le nom réel de la méthode choisie, par exemple ZELLE. Aucun paiement n’est confirmé par cette action.
+
+### Rejet Cloudflare « Upstream error »
+
+Un rejet à destination de `support@parrotrehome.com` concerne la réception/redirection, pas nécessairement les envois API Resend. Consulter Cloudflare → Email Routing → Activity log pour le motif détaillé et vérifier que l’adresse de destination est validée et reçoit encore les emails. Tester depuis une boîte différente de la destination du transfert. Si Zoho est maintenant le service de réception du domaine principal, ses MX doivent remplacer ceux de Cloudflare Email Routing ; garder les enregistrements d’authentification d’envoi demandés par Resend. Aucun changement DNS n’est appliqué automatiquement par l’application.
+
+### Logo dans les messages et avatar de l’expéditeur
+
+Le logo est inclus dans le corps HTML des emails. Les paragraphes et sauts de ligne utilisent du HTML explicite, compatible avec les clients qui ignorent `white-space: pre-wrap`, notamment Outlook.
+
+La petite photo affichée à côté de l’expéditeur dans Outlook ou Gmail dépend du fournisseur du destinataire et de son carnet d’adresses. Le HTML de l’email ne peut pas imposer cet avatar. BIMI peut permettre un logo vérifié chez certains fournisseurs, avec DMARC et parfois un certificat de marque payant ; cela ne garantit pas son affichage partout.
+
+### Configuration retenue : Cloudflare vers Outlook
+
+Conserver uniquement les MX Cloudflare pour la réception du domaine principal, vérifier la destination Outlook et activer les règles `support` et `orders`. Conserver séparément les enregistrements DNS d’envoi Resend. Ne pas installer les MX Zoho sur ce même domaine pendant que Cloudflare reçoit les emails.
+
+Dans `/etc/parrotrehome/runtime.env`, utiliser `MAIL_INBOUND_PROVIDER=mailbox` et `MAIL_REPLY_TO=support@parrotrehome.com`. Pour recevoir les notifications de commande indépendamment du transfert Cloudflare, configurer `MAIL_ORDER_NOTIFY` avec l’adresse Outlook réelle de l’équipe. Recréer `app` après modification du fichier. Les réponses directes aux emails se lisent dans Outlook ; les messages écrits par les clients sur le site restent visibles dans leurs dossiers. La boîte Resend de l’administration nécessite un raccordement entrant distinct et n’est pas alimentée automatiquement par Cloudflare Email Routing.

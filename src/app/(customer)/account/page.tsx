@@ -1,3 +1,4 @@
+import { ChangePassword } from "@/components/parrotrehome/change-password";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -21,6 +22,7 @@ export default async function AccountPage() {
     <div className="bg-white border rounded-xl p-6 space-y-3"><h2 className="font-heading text-xl">Recent sign-in activity</h2>
       {activity.length ? <ul className="space-y-2 text-sm">{activity.map((item) => <li key={item.id}>{formatDateUTC(item.timestamp)} · {item.action === "LOGIN" ? "Successful sign-in" : "Failed sign-in attempt"}</li>)}</ul> : <p className="text-sm text-feather">No sign-in activity has been recorded yet.</p>}
     </div>
+    <ChangePassword />
     <Link href={user.role === "CLIENT" ? "/my-requests" : "/admin"} className="inline-flex rounded-full bg-tail-red text-white px-5 py-3">{user.role === "CLIENT" ? "My requests" : "Open administration"}</Link>
   </section>;
 }

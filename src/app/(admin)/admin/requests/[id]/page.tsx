@@ -86,7 +86,7 @@ export default async function DossierPage({
   });
   const activeInstruction = request.paymentInstructions.find((i) => i.status === "ACTIVE");
   const canAssign = can(user.role, "request:assign");
-  const canPrepareInstructions = can(user.role, "payment:prepare_instructions");
+  const canPrepareInstructions = can(user.role, "payment:prepare_instructions") && (user.role !== "AGENT" || request.agentId === user.id);
   const canVerify = can(user.role, "payment:validate");
   const canCancel = can(user.role, "request:cancel");
 
@@ -378,16 +378,17 @@ export default async function DossierPage({
             {canAssign && request.status === "RECEIVED" && (
               <AssignAgentForm requestId={request.id} agents={agents} currentAgentId={request.agentId} />
             )}
-            {canAssign && request.status === "PENDING_REVIEW" && (
-              <AssignAgentForm requestId={request.id} agents={agents} currentAgentId={request.agentId} allowTransfer />
+            {canAssign && ["PENDING_REVIEW", "AWAITING_INSTRUCTIONS"].includes(request.status) && (
+              <AssignAgentForm requestId={request.id} agents={agents} currentAgentId={request.agentId} allowTransfer={!!request.agentId} />
             )}
 
             {/* Create payment instructions */}
-            {canPrepareInstructions && ["AWAITING_INSTRUCTIONS", "INSTRUCTIONS_SENT"].includes(request.status) && request.selectedPaymentMethod && (
+            {canPrepareInstructions && ["RECEIVED", "PENDING_REVIEW", "AWAITING_INSTRUCTIONS", "INSTRUCTIONS_SENT"].includes(request.status) && (
               <CreateInstructionsForm
                 requestId={request.id}
                 paymentMethod={request.selectedPaymentMethod}
-                totalUsd={Number(request.totalQuoteUsd ?? 0)}
+                paymentMethods={paymentMethods}
+                totalUsd={Number(request.finalTotalUsd ?? request.totalQuoteUsd ?? 0)}
                 reference={request.reference}
               />
             )}

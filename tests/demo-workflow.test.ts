@@ -52,3 +52,10 @@ test("saved template is used by the next email and user text remains escaped", (
   expect(email.body).toContain("Received");
   expect(email.html).not.toContain("<script>");
 });
+
+test("email paragraphs and line breaks remain readable without CSS whitespace support", () => {
+  const html = renderEmailHtml("Request received", "Dear Alex,\nYour request is saved.\n\nNext steps:\nReview your request.");
+  expect(html).toContain("Dear Alex,<br>Your request is saved.");
+  expect(html).toContain("Next steps:<br>Review your request.");
+  expect(html).not.toContain("white-space:pre-wrap");
+});

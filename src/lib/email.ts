@@ -1,5 +1,4 @@
-import { replyAddress } from "./email-signatures";
-import { deliverEmail, mailConfiguration } from "./email-transport";
+import { deliverEmail, mailConfiguration, customerReplyAddress } from "./email-transport";
 import { resolveEmailTemplate } from "./email-templates";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
@@ -55,7 +54,7 @@ export async function sendEmail(payload: EmailPayload): Promise<{ messageId: str
   let errorMessage: string | undefined;
 
   try {
-    status = await deliverEmail({ ...payload, replyTo: payload.template === "staff-order-received" ? undefined : replyAddress("request", payload.requestId) }, key);
+    status = await deliverEmail({ ...payload, replyTo: payload.template === "staff-order-received" ? undefined : customerReplyAddress("request", payload.requestId) }, key);
 
   } catch (err) {
     status = "FAILED";
@@ -83,28 +82,29 @@ export function buildRequestReceivedEmail(opts: {
   customerEmail: string;
   itemsSummary: string;
   totalQuote: number | null;
+  paymentMethodName?: string;
   nextSteps: string[];
 }): EmailPayload {
   const body = `Dear ${opts.customerName},
 
 We received your request #${opts.reference}. Your selected items and next steps are listed below. Payment is not yet confirmed.
 
-──────────────────
 REQUEST SUMMARY
-──────────────────
 Reference: ${opts.reference}
+Payment preference: ${opts.paymentMethodName || "To be confirmed with your agent"}
 Items:
 ${opts.itemsSummary}
 ${opts.totalQuote != null ? `\nEstimated total: $${opts.totalQuote.toFixed(2)} USD` : ""}
 
-──────────────────
 NEXT STEPS
-──────────────────
 ${opts.nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
 Important: ParrotRehome never collects payment information on-site. One of our authorized agents will reach out with secure, traceable payment instructions.
 
 Thank you for choosing responsible avian companionship.
+
+Track your request:
+${process.env.NEXTAUTH_URL || "https://parrotrehome.com"}/my-requests
 
 — ParrotRehome Team
 You can reply to this email to contact our support team. Keep your request reference in the subject.`;
@@ -133,7 +133,7 @@ export function buildInstructionsReadyEmail(opts: {
     timeZone: "UTC",
     timeZoneName: "short",
   });
-  const method = process.env.PAYMENT_EMAIL_LABEL || "CHMK";
+  const method = opts.paymentMethodName || process.env.PAYMENT_EMAIL_LABEL || "Payment";
   const content = resolveEmailTemplate("instructions-ready", {
     customerName: opts.customerName,
     reference: opts.reference,
@@ -377,29 +377,44 @@ export async function sendRequestNotification(requestId: string, template: "paym
 export async function sendPaymentReminders(now = new Date()) {
   const instructions = await db.paymentInstruction.findMany({
     where: { status: "ACTIVE", expiryAt: { gt: now, lte: new Date(now.getTime() + 5 * 60000) }, request: { status: "INSTRUCTIONS_SENT" } },
-    include: { request: true }, take: 100, orderBy: { expiryAt: "asc" },
+    include: { request: { include: { selectedPaymentMethod: true } } }, take: 100, orderBy: { expiryAt: "asc" },
   });
   let sent = 0;
   for (const instruction of instructions) {
     const request = instruction.request;
     const result = await sendEmail({ requestId: request.id, template: "payment-reminder", senderRole: "system", toAddress: request.customerEmail, fromAddress: mailConfiguration().from, eventId: instruction.id,
-      ...resolveEmailTemplate("payment-reminder", { customerName: request.customerName, reference: request.reference, expiry: instruction.expiryAt.toISOString(), secureLink: buildSecureInstructionsLink(process.env.NEXTAUTH_URL || "http://localhost:3000", instruction.secureLinkHash) }),
+      ...resolveEmailTemplate("payment-reminder", { customerName: request.customerName, reference: request.reference, paymentLabel: request.selectedPaymentMethod?.name || "Selected method", expiry: instruction.expiryAt.toISOString(), secureLink: buildSecureInstructionsLink(process.env.NEXTAUTH_URL || "http://localhost:3000", instruction.secureLinkHash) }),
     });
     if (result.status === "SENT") sent++;
   }
   return { examined: instructions.length, acceptedByProvider: sent };
 }
 export async function notifyOrderTeam(requestId: string) {
-  const to = process.env.MAIL_ORDER_NOTIFY;
-  if (!to) return;
-  const request = await db.request.findUniqueOrThrow({ where: { id: requestId } });
-  return sendEmail({ requestId, template: "staff-order-received", senderRole: "system", toAddress: to, fromAddress: mailConfiguration().from, eventId: requestId,
-    subject: `New request #${request.reference} — review required`,
-    body: `A new request from ${request.customerName} is ready for review.
+  const to = process.env.MAIL_ORDER_NOTIFY || mailConfiguration().replyTo;
+  const request = await db.request.findUniqueOrThrow({ where: { id: requestId }, include: { items: { include: { bird: true, product: true } }, selectedPaymentMethod: true } });
+  const items = request.items.map(item => `- ${item.bird?.commonName || item.product?.name || "Item"} × ${item.quantity}: $${(item.quotedPriceUsd * item.quantity).toFixed(2)} USD`).join("\n");
+  const body = `New request #${request.reference}
 
-Open the administration to review the items and prepare CHMK payment instructions:
+CUSTOMER
+Name: ${request.customerName}
+Email: ${request.customerEmail}
+Phone: ${request.customerPhone || "Not provided"}
+State: ${request.shippingState}
+Address: ${request.shippingAddress || "Not provided"}
+
+ORDER
+${items}
+Estimated total: $${(request.finalTotalUsd ?? request.totalQuoteUsd ?? 0).toFixed(2)} USD
+Payment preference: ${request.selectedPaymentMethod?.name || "Not selected"}
+
+PLACEMENT INFORMATION
+Experience: ${request.experience || "Not provided"}
+Habitat: ${request.habitat || "Not provided"}
+Preferences / questions: ${request.preferences || "None"}
+
+Review the request and email the payment instructions:
 ${process.env.NEXTAUTH_URL || "http://localhost:3000"}/admin/requests/${requestId}
 
-No payment has been confirmed.`,
-  });
+No payment has been confirmed.`;
+  return sendEmail({ requestId, template: "staff-order-received", senderRole: "system", toAddress: to, fromAddress: mailConfiguration().from, eventId: requestId, subject: `New request #${request.reference} — review required`, body });
 }

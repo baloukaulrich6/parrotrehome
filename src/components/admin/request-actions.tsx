@@ -76,20 +76,21 @@ export function AssignAgentForm({
 export function CreateInstructionsForm({
   requestId,
   paymentMethod,
+  paymentMethods,
   totalUsd,
   reference,
 }: {
   requestId: string;
-  paymentMethod: { id: string; name: string; instructionsTemplate: string; officialProvider: string };
+  paymentMethod: { id: string; name: string; instructionsTemplate: string; officialProvider: string } | null;
+  paymentMethods: { id: string; name: string; instructionsTemplate: string; officialProvider: string }[];
   totalUsd: number;
   reference: string;
 }) {
   const router = useRouter();
-  const [body, setBody] = useState(
-    paymentMethod.instructionsTemplate
-      .replace("{{requestReference}}", reference)
-      .replace("{{totalQuoteUsd}}", totalUsd.toFixed(2))
-  );
+  const initial = paymentMethods.find(method => method.id === paymentMethod?.id) || paymentMethods[0];
+  const [methodId, setMethodId] = useState(initial?.id || "");
+  const format = (text: string) => text.replaceAll("{{requestReference}}", reference).replaceAll("{{totalQuoteUsd}}", totalUsd.toFixed(2));
+  const [body, setBody] = useState(format(initial?.instructionsTemplate || ""));
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -103,7 +104,7 @@ export function CreateInstructionsForm({
       const res = await fetch(`/api/admin/requests/${requestId}/instructions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: body.trim() }),
+        body: JSON.stringify({ body: body.trim(), paymentMethodId: methodId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
@@ -119,12 +120,16 @@ export function CreateInstructionsForm({
   return (
     <div className="bg-iris/5 border border-iris/30 rounded-lg p-3">
       <p className="text-[11px] font-body font-semibold text-feather uppercase tracking-wide mb-2 flex items-center gap-1">
-        <Lock className="h-3.5 w-3.5 text-iris" aria-hidden /> Create secure instructions (A-07)
+        <Lock className="h-3.5 w-3.5 text-iris" aria-hidden /> Email payment instructions
       </p>
       <p className="text-[12px] text-feather font-body mb-2">
-        Method: <strong className="text-slate">{paymentMethod.name}</strong> via {paymentMethod.officialProvider}
+        Review the payment details below. They will be available through a personal link valid for 20 minutes.
       </p>
+      <label className="block text-sm mb-3">Payment method<select aria-label="Payment method" value={methodId} onChange={event => { setMethodId(event.target.value); setBody(format(paymentMethods.find(method => method.id === event.target.value)?.instructionsTemplate || "")); }} className="block w-full rounded-md border p-2 mt-1"><option value="">Choose an active method</option>{paymentMethods.map(method => <option key={method.id} value={method.id}>{method.name}</option>)}</select></label>
+      {!paymentMethods.length && <p className="text-tail-red text-sm">Activate a method in Payment methods before sending.</p>}
+      <label htmlFor="payment-instructions" className="block text-sm">Payment information for this customer</label>
       <textarea
+        id="payment-instructions"
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={8}
@@ -134,11 +139,11 @@ export function CreateInstructionsForm({
       <button
         type="button"
         onClick={submit}
-        disabled={submitting}
+        disabled={submitting || !methodId || body.trim().length < 20}
         className="mt-2 w-full h-9 rounded-md bg-iris hover:bg-iris-dark text-slate text-[13px] font-body font-semibold inline-flex items-center justify-center gap-2 disabled:bg-feather/40"
       >
         {submitting ? <Clock className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-        Send secure instructions
+        Email instructions to customer
       </button>
       <p className="text-[11px] text-feather font-body mt-2">
         A non-guessable, signed link will be generated. The customer receives an agent-signed email.

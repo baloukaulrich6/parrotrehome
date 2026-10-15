@@ -18,6 +18,7 @@ import { z } from "zod";
 // Only an authorized agent can publish; expiration is effectively controlled.
 
 const schema = z.object({
+  paymentMethodId: z.string().min(1).optional(),
   body: z.string().min(20, "Instructions body is too short").max(5000),
 });
 
@@ -32,6 +33,7 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (req.headers.get("origin") !== new URL(process.env.NEXTAUTH_URL || req.url).origin) return new Response(null, { status: 403 });
     const { id } = await params;
     const body = await req.json();
     const parsed = schema.safeParse(body);
@@ -53,18 +55,14 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (!["AWAITING_INSTRUCTIONS", "INSTRUCTIONS_SENT"].includes(request.status)) {
+    if (!["RECEIVED", "PENDING_REVIEW", "AWAITING_INSTRUCTIONS", "INSTRUCTIONS_SENT"].includes(request.status)) {
       return NextResponse.json(
         { error: `Cannot create instructions in status ${request.status}` },
         { status: 400 }
       );
     }
-    if (!request.selectedPaymentMethod) {
-      return NextResponse.json(
-        { error: "Customer has not selected a payment method yet" },
-        { status: 400 }
-      );
-    }
+    const paymentMethod = await db.paymentMethod.findFirst({ where: { id: parsed.data.paymentMethodId || request.selectedPaymentMethodId || "", active: true } });
+    if (!paymentMethod) return NextResponse.json({ error: "Choose an active payment method before sending instructions." }, { status: 400 });
 
     const newStatus = "INSTRUCTIONS_SENT";
     if (request.status !== newStatus && !canTransition(request.status, newStatus)) {
@@ -77,9 +75,10 @@ export async function POST(
 
     // Publish a new version and revoke the old link atomically.
     const instruction = await db.$transaction(async (tx) => {
+      if (!await tx.paymentMethod.findFirst({ where: { id: paymentMethod.id, active: true } })) throw new Error("Payment method was disabled. Please refresh.");
       const changed = await tx.request.updateMany({
         where: { id, status: request.status, selectedPaymentMethodId: request.selectedPaymentMethodId },
-        data: { status: newStatus, instructionsSentAt: new Date() },
+        data: { status: newStatus, selectedPaymentMethodId: paymentMethod.id, instructionsSentAt: new Date() },
       });
       if (changed.count !== 1) throw new Error("Request changed. Refresh before sending instructions.");
       const previous = await tx.paymentInstruction.findFirst({
@@ -124,8 +123,8 @@ export async function POST(
       agentRole: user.role.replace(/_/g, " ").toLowerCase(),
       secureLink,
       expiryAt,
-      paymentMethodName: request.selectedPaymentMethod.name,
-      totalUsd: request.totalQuoteUsd == null ? null : Number(request.totalQuoteUsd),
+      paymentMethodName: paymentMethod.name,
+      totalUsd: request.totalQuoteUsd == null ? null : Number(request.finalTotalUsd ?? request.totalQuoteUsd),
     });
     emailPayload.requestId = id;
     emailPayload.eventId = instruction.id;

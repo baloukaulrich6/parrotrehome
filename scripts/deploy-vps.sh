@@ -20,7 +20,7 @@ while (($#)); do
     --plan) plan=true; shift ;;
     --help|-h)
       echo 'sudo bash scripts/deploy-vps.sh --email owner@example.com --admin-email admin@example.com [--domain parrotrehome.com] [--plan]'
-      echo 'Run on Ubuntu/Debian VPS. Requires project files, DNS pointing to VPS and ports 80/443 free. Mail remains preview-only.'
+      echo 'Run on Ubuntu/Debian VPS. Requires project files, DNS pointing to VPS and ports 80/443 free. Mail defaults to preview; live delivery requires explicit server configuration.'
       exit 0 ;;
     *) die "Unknown option: $1" ;;
   esac
@@ -113,4 +113,6 @@ done
 $ready || die 'Database-backed application health check failed.'
 curl --fail --silent --show-error --resolve "$domain:443:127.0.0.1" --retry 6 --retry-delay 5 --retry-all-errors --max-time 15 "https://$domain/api/payment-methods" >/dev/null
 curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors --max-time 15 "https://$domain/api/payment-methods" >/dev/null
-printf '\nSite: https://%s\nAdmin: https://%s/admin\nAccount: %s\nEmail: preview only; configure catalog, delivery areas and payment provider before accepting orders.\n' "$domain" "$domain" "$admin_email"
+printf '\nSite: https://%s\nAdmin: https://%s/admin\nAccount: %s\nConfigure catalog, delivery areas and payment provider before accepting orders.\n' "$domain" "$domain" "$admin_email"
+
+"${compose[@]}" exec -T app node -e 'console.log("Email transport: " + (process.env.MAIL_TRANSPORT || "preview") + "; Resend API key: " + (process.env.RESEND_API_KEY ? "configured" : "not configured") + ". Verify delivery with a test request.");'

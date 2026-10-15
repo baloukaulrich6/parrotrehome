@@ -135,6 +135,8 @@ export async function getServerUser() {
     id: true, email: true, name: true, role: true, status: true,
   } });
   if (!user || !sessionAllowsAccess(user, session.user)) return null;
+  const passwordChange = await db.auditLog.findFirst({ where: { actorId: user.id, objectType: "Password", objectId: user.id, action: "UPDATE" }, orderBy: { timestamp: "desc" }, select: { timestamp: true } });
+  if (passwordChange && (!session.user.authAt || session.user.authAt <= passwordChange.timestamp.getTime())) return null;
   return { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status };
 }
 

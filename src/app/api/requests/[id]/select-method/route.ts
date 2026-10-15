@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
+import { can } from "@/lib/rbac";
 import { audit } from "@/lib/audit";
 import { canTransition } from "@/lib/constants";
 import { z } from "zod";
@@ -47,7 +48,9 @@ export async function POST(
       }
     }
 
-    if (request.status !== "PENDING_REVIEW") {
+    if (user.role !== "CLIENT" && (!can(user.role, "payment:prepare_instructions") || (user.role === "AGENT" && request.agentId !== user.id))) return new Response(null, { status: 403 });
+
+    if (!["RECEIVED", "PENDING_REVIEW"].includes(request.status)) {
       return NextResponse.json(
         { error: `Cannot select payment method in status ${request.status}` },
         { status: 400 }

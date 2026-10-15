@@ -10,9 +10,9 @@ interface PaymentMethod {
   officialProvider: string;
 }
 
-export function PaymentMethodChooser({ requestId }: { requestId: string }) {
-  const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(true);
+export function PaymentMethodChooser({ requestId, initialMethods = [] }: { requestId: string; initialMethods?: PaymentMethod[] }) {
+  const [methods, setMethods] = useState<PaymentMethod[]>(initialMethods);
+  const [loading, setLoading] = useState(initialMethods.length === 0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 

@@ -36,7 +36,7 @@ The ParrotRehome team`,
     subject: "Payment instructions expiring soon — Request #{{reference}}",
     body: `Dear {{customerName}},
 
-We have not yet received a payment confirmation reference for request #{{reference}}. The current CHMK payment instructions expire at {{expiry}}.
+We have not yet received a payment confirmation reference for request #{{reference}}. The current {{paymentLabel}} payment instructions expire at {{expiry}}.
 
 If you have already paid, please do not pay again. Submit your payment reference through My Requests so our team can verify it.
 

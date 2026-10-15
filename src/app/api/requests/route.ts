@@ -19,6 +19,7 @@ const schema = z.object({
   customerName: z.string().min(2),
   customerEmail: z.string().email(),
   customerPhone: z.string().optional(),
+  paymentMethodId: z.string().min(1).optional(),
   shippingState: z.string().min(2),
   shippingAddress: z.string().optional(),
   experience: z.enum(["Beginner", "Intermediate", "Expert"]).optional(),
@@ -59,6 +60,10 @@ export async function POST(req: Request) {
     // Rate limit: 10 request submissions per hour per IP
     const rl = checkRateLimit(req, "REQUEST_SUBMIT");
     if (!rl.ok && rl.response) return rl.response;
+
+    const activeMethods = await db.paymentMethod.findMany({ where: { active: true }, orderBy: { displayOrder: "asc" } });
+    const selectedMethod = data.paymentMethodId ? activeMethods.find(method => method.id === data.paymentMethodId) : activeMethods.length === 1 ? activeMethods[0] : null;
+    if (data.paymentMethodId && !selectedMethod) return NextResponse.json({ error: "This payment method is no longer available. Refresh and choose an active method." }, { status: 400 });
 
     // Validate served state
     const state = await db.servedState.findUnique({
@@ -158,12 +163,14 @@ export async function POST(req: Request) {
 
     // Create request + items in a transaction (T-02 bird lock)
     const request = await db.$transaction(async (tx) => {
+      if (selectedMethod && !await tx.paymentMethod.findFirst({ where: { id: selectedMethod.id, active: true } })) throw new Error("The selected payment method was disabled. Please refresh.");
       const r = await tx.request.create({
         data: {
           reference,
           type,
           status: "RECEIVED",
           customerId: user?.id ?? null,
+          selectedPaymentMethodId: selectedMethod?.id ?? null,
           customerName: data.customerName,
           customerEmail: data.customerEmail,
           customerPhone: data.customerPhone,
@@ -227,7 +234,7 @@ export async function POST(req: Request) {
     });
 
     // Build & send no-reply email (F-22)
-    const itemsSummary = data.items
+    const itemsSummary = serverItems
       .map((i) => `  - ${i.name} (${i.type.toLowerCase()}) × ${i.qty} — $${(i.priceUsd * i.qty).toFixed(2)}`)
       .join("\n");
     const nextSteps = [
@@ -240,11 +247,12 @@ export async function POST(req: Request) {
       customerName: data.customerName,
       customerEmail: data.customerEmail,
       itemsSummary,
-      totalQuote,
+      totalQuote: finalTotalUsd ?? totalQuote,
+      paymentMethodName: selectedMethod?.name,
       nextSteps,
     });
     emailPayload.requestId = request.id;
-    await sendEmail(emailPayload);
+    const delivery = await sendEmail(emailPayload);
     await notifyOrderTeam(request.id);
 
     // Agent notification (F-24): internal Message row indicating assignment is needed
@@ -265,6 +273,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       requestId: request.id,
       reference: request.reference,
+      customerEmail: request.customerEmail,
+      emailStatus: delivery.status,
     });
   } catch (err) {
     console.error("[requests] POST error:", err);

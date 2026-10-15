@@ -1,3 +1,4 @@
+import { replyAddress } from "./email-signatures";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { renderEmailHtml } from "./email-design";
@@ -9,7 +10,11 @@ export function mailConfiguration() {
     from: process.env.MAIL_FROM || "no-reply@parrotrehome.com",
     replyTo: process.env.MAIL_REPLY_TO || "support@parrotrehome.com",
     configured: !!process.env.RESEND_API_KEY,
+    inboundProvider: process.env.MAIL_INBOUND_PROVIDER === "resend" ? "resend" : "mailbox",
   };
+}
+export function customerReplyAddress(type: "request" | "inbox", id: string) {
+  return mailConfiguration().inboundProvider === "resend" ? replyAddress(type, id) : undefined;
 }
 export async function deliverEmail(payload: { toAddress: string; subject: string; body: string; html?: string; replyTo?: string }, key: string): Promise<"QUEUED" | "SENT"> {
   const config = mailConfiguration();
