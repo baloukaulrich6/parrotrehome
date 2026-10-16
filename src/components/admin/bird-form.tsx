@@ -1,5 +1,6 @@
 "use client";
 
+import { ageInput, ageToYears, type AgeUnit } from "@/lib/bird-age";
 import { ImageUpload } from "./image-upload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -39,11 +40,11 @@ export function BirdFormDialog({
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [age, setAge] = useState(() => ageInput(bird?.ageYears == null || bird.ageYears === "" ? null : Number(bird.ageYears)));
   const [form, setForm] = useState({
     species: bird?.species ?? "",
     commonName: bird?.commonName ?? "",
     individualId: bird?.individualId ?? "",
-    ageYears: bird?.ageYears ?? "",
     sex: bird?.sex ?? "Unknown",
     photos: bird?.photos ?? "",
     status: bird?.status ?? "AVAILABLE",
@@ -71,7 +72,7 @@ export function BirdFormDialog({
       }
       const payload = {
         ...form,
-        ageYears: form.ageYears ? Number(form.ageYears) : null,
+        ageYears: age.value === "" ? null : ageToYears(Number(age.value), age.unit),
         priceUsd: form.priceUsd ? Number(form.priceUsd) : null,
         photos: photosJson || "[]",
       };
@@ -128,8 +129,8 @@ export function BirdFormDialog({
             <Field label="Individual ID / band" htmlFor="individualId">
               <input id="individualId" type="text" value={form.individualId} onChange={(e) => update("individualId", e.target.value)} placeholder="e.g., AG-2026-001" className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
             </Field>
-            <Field label="Age (years)" htmlFor="ageYears">
-              <input id="ageYears" type="number" step="0.5" min="0" value={form.ageYears} onChange={(e) => update("ageYears", e.target.value)} className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
+            <Field label="Age (approximate if not documented)" htmlFor="bird-age-value">
+              <div className="flex gap-2"><input id="bird-age-value" type="number" step="any" min="0" value={age.value} onChange={event => setAge({ ...age, value: event.target.value })} className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory" /><select aria-label="Age unit" value={age.unit} onChange={event => setAge({ ...age, unit: event.target.value as AgeUnit })} className="h-10 rounded-md border bg-ivory px-2"><option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option></select></div>
             </Field>
             <Field label="Sex" htmlFor="sex">
               <select id="sex" value={form.sex} onChange={(e) => update("sex", e.target.value)} className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring">

@@ -12,7 +12,7 @@ const schema = z.object({
   species: z.string().optional(),
   commonName: z.string().min(2),
   individualId: z.string().optional(),
-  ageYears: z.number().nullable().optional(),
+  ageYears: z.number().min(0).max(150).nullable().optional(),
   sex: z.string().optional(),
   photos: photosSchema,
   status: z.enum(["AVAILABLE", "RESERVED", "UNAVAILABLE", "SOLD"]),

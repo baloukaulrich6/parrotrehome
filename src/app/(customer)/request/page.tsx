@@ -1,4 +1,5 @@
 "use client";
+import { PolicyLinks } from "@/components/parrotrehome/policy-links";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -272,6 +273,8 @@ export default function RequestPage() {
               {methods.length ? methods.map(method => <label key={method.id} className="flex items-center gap-3 p-3 border rounded-lg mb-2"><input type="radio" name="paymentMethodId" required value={method.id} checked={paymentMethodId === method.id} onChange={() => setPaymentMethodId(method.id)} /><span>{method.name}</span></label>) : <p role="status" className="text-sm text-feather">{paymentError ? "Unable to load payment methods. You can submit your request and contact our team." : "Our team will confirm the available payment options with you."}</p>}
             </fieldset>
 
+            <section className="bg-white border rounded-xl p-5 space-y-3"><h2 className="font-heading text-xl">Review before submitting</h2><PolicyLinks /><p className="text-sm text-feather">Submitting is not payment confirmation. See cancellation eligibility and refund steps before you pay. Approved refunds are initiated within 5 business days; provider crediting may take a further indicative 3–10 business days.</p></section>
+
             {/* Consent */}
             <fieldset className="bg-forest/5 border border-forest/20 rounded-xl p-5">
               <label className="flex items-start gap-3 cursor-pointer">
@@ -283,7 +286,7 @@ export default function RequestPage() {
                   className="mt-1 h-4 w-4 rounded border-feather/50 text-tail-red focus-ring"
                 />
                 <span className="text-[13px] font-body text-slate leading-relaxed">
-                  I confirm that the information above is accurate. I consent
+                  I confirm that I am at least 18 and the information above is accurate. I agree to the Terms of Service, Payment, Delivery and Refund policies linked above. I consent
                   to be contacted by an authorized ParrotRehome agent regarding my
                   request, and I understand that <strong>no payment is
                   collected on this website</strong>. Payment instructions

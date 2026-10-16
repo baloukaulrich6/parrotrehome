@@ -1,3 +1,4 @@
+import { formatBirdAge } from "@/lib/bird-age";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { PhotoGallery } from "@/components/parrotrehome/photo-gallery";
@@ -91,7 +92,7 @@ export default async function BirdDetailPage({
 
               {/* Quick facts grid */}
               <dl className="grid grid-cols-2 gap-4 mb-6">
-                <Fact icon={Calendar} label="Age" value={bird.ageYears ? `${bird.ageYears} years` : "—"} />
+                <Fact icon={Calendar} label="Age" value={formatBirdAge(bird.ageYears)} />
                 <Fact icon={VenusAndMars} label="Sex" value={bird.sex ?? "Unknown"} />
                 <Fact icon={MapPin} label="Location" value={bird.location ?? "—"} />
                 <Fact icon={FileBadge} label="ID / Band" value={bird.individualId ?? "—"} />
@@ -132,9 +133,8 @@ export default async function BirdDetailPage({
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="h-5 w-5 text-forest flex-shrink-0 mt-0.5" aria-hidden />
                   <p className="text-[13px] font-body text-slate leading-relaxed">
-                    <strong className="font-semibold">Verified provenance.</strong>{" "}
-                    This bird has an individual dossier with traceable documents.
-                    CITES paperwork on file where applicable.
+                    <strong className="font-semibold">Confirm the available documentation.</strong>{" "}
+                    Ask us about provenance, health records and any required permits before payment. Available documents depend on the individual bird and route.
                   </p>
                 </div>
               </div>

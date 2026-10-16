@@ -1,3 +1,4 @@
+import { CookieSettingsButton } from "@/components/cookie-controls";
 import { defaultSiteSettings, type SiteSettings } from "@/lib/site-settings-schema";
 import Link from "next/link";
 import { Mail, Phone, MapPin, Clock, Heart } from "lucide-react";
@@ -19,6 +20,11 @@ const FOOTER_LINKS = [
     links: [
       { href: "/about", label: "Our promise" },
       { href: "/contact", label: "Contact" },
+      { href: "/policies", label: "Policies & customer rights" },
+      { href: "/cms/refunds", label: "Refunds & cancellations" },
+      { href: "/cms/payment", label: "Payment policy" },
+      { href: "/cms/delivery", label: "Locations & delivery" },
+      { href: "/cms/cookies", label: "Cookie policy" },
       { href: "/cms/terms", label: "Terms of service" },
       { href: "/cms/privacy", label: "Privacy policy" },
     ],
@@ -115,7 +121,6 @@ export function ParrotRehomeFooter({ settings = defaultSiteSettings }: { setting
         <div className="mt-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-[12px] text-ivory/60 font-body">
           <p>
             © {new Date().getFullYear()} {BRAND.name}. All rights reserved.
-            {" "}Brand provisional — pending client validation.
           </p>
           <p className="flex items-center gap-1.5">
             Built with
@@ -124,6 +129,6 @@ export function ParrotRehomeFooter({ settings = defaultSiteSettings }: { setting
           </p>
         </div>
       </div>
-    </footer>
+    <div className="px-6 pb-4"><CookieSettingsButton /></div></footer>
   );
 }

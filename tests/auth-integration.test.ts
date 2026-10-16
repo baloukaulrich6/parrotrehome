@@ -65,6 +65,15 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     const initial = await db.user.create({ data: { email: "admin@example.com", name: "HTTP Administrator", role: "SUPER_ADMIN", status: "ACTIVE", passwordHash: hash, mfaEnabled: true, mfaSecret: "legacy-setting-must-not-block-password-login" } });
     await db.user.create({ data: { email: "client@example.com", name: "HTTP Client", role: "CLIENT", status: "ACTIVE", passwordHash: hash } });
     await start();
+    for (const slug of ["terms", "payment", "refunds", "delivery", "privacy", "cookies"]) {
+      const response = await fetch(base + "/cms/" + slug);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain("Purchase policies");
+      if (slug === "refunds") { expect(html).toContain("5 business days"); expect(html).toContain("support@parrotrehome.com"); }
+    }
+    expect((await fetch(base + "/policies")).status).toBe(200);
+
     const wrongPassword = await login(initial.email, "incorrect-password");
     expect((await wrongPassword.session()).user).toBeUndefined();
     const admin = await login(initial.email);
@@ -74,6 +83,16 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     expect(await directory.text()).not.toMatch(/MFA|Authenticator/);
     expect((await admin.request("/api/mfa", { action: "init" }, "POST")).status).toBe(404);
     expect((await admin.request("/staff-mfa")).status).toBe(404);
+    expect((await admin.request("/admin/cms")).status).toBe(200);
+    expect((await admin.request("/api/admin/cms/about", { title: "Custom About", body: "Independent breeders — custom CMS content.", isPublished: true }, "PUT")).status).toBe(200);
+    expect(await (await fetch(base + "/about")).text()).toContain("custom CMS content");
+    const young = await db.bird.create({ data: { species: "Young Bird", commonName: "Six Month Fixture", photos: "[]", ageYears: 0.5 } });
+    const older = await db.bird.create({ data: { species: "Older Bird", commonName: "Older Age Fixture", photos: "[]", ageYears: 8 } });
+    const youngHtml = await (await fetch(base + "/parrots?age=under-1&sort=age-asc")).text();
+    expect(youngHtml).toContain("Six Month Fixture"); expect(youngHtml).toContain("6 months"); expect(youngHtml).not.toContain(`href="/parrots/${older.id}"`);
+    expect((await admin.request(`/api/admin/birds/${young.id}`, { species: "Young Bird", commonName: "Six Month Fixture", ageYears: -1, photos: "[]", status: "AVAILABLE" }, "PUT")).status).toBe(400);
+    expect((await admin.request(`/api/admin/birds/${young.id}`, { species: "Young Bird", commonName: "Six Month Fixture", ageYears: 0, photos: "[]", status: "AVAILABLE" }, "PUT")).status).toBe(200);
+    expect((await db.bird.findUniqueOrThrow({ where: { id: young.id } })).ageYears).toBe(0);
     const createManager = await admin.request("/api/admin/users", { name: "HTTP Manager", email: "manager@example.com", password, role: "MANAGER" }, "POST");
     expect(createManager.status).toBe(201);
     const managerId = (await createManager.json()).user.id;
@@ -173,6 +192,10 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     const createdOrder = await submitted.json();
     expect(createdOrder.emailStatus).toBe("QUEUED");
     expect((await db.request.findUniqueOrThrow({ where: { id: createdOrder.requestId } })).selectedPaymentMethodId).toBe(zelle.id);
+    const policyAudit = await db.auditLog.findFirstOrThrow({ where: { objectId: createdOrder.requestId, action: "CREATE" } });
+    const policyMetadata = JSON.parse(policyAudit.metadata!);
+    expect(policyMetadata.policyAcknowledgement.policies).toHaveLength(5);
+    expect(policyMetadata.policyAcknowledgement.policies[0].digest).toMatch(/^[a-f0-9]{64}$/);
     const acknowledgement = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "request-received" } });
     expect(acknowledgement.body).toContain("ZELLE"); expect(acknowledgement.body).toContain("Order Bird"); expect(acknowledgement.body).toContain("900.00"); expect(acknowledgement.body).not.toContain("Untrusted client name");
     const teamEmail = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "staff-order-received" } });

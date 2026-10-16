@@ -1,3 +1,4 @@
+import { contentPages } from "@/lib/policy-content";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -22,16 +23,15 @@ export async function PUT(
     if (!can(user.role, "cms:manage")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    if (req.headers.get("origin") !== new URL(process.env.NEXTAUTH_URL || req.url).origin) return new Response(null, { status: 403 });
     const { slug } = await params;
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid" }, { status: 400 });
     }
-    const page = await db.cmsPage.update({
-      where: { slug },
-      data: parsed.data,
-    });
+    if (!Object.hasOwn(contentPages, slug) && !await db.cmsPage.findUnique({ where: { slug } })) return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    const page = await db.cmsPage.upsert({ where: { slug }, update: parsed.data, create: { slug, ...parsed.data } });
     await audit({
       actorId: user.id,
       actorRole: user.role,

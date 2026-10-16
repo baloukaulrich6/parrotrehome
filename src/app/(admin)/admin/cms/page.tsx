@@ -1,3 +1,4 @@
+import { contentPages, POLICY_VERSION } from "@/lib/policy-content";
 import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -14,9 +15,10 @@ export default async function AdminCmsPage() {
   await requireStaffPage();
   const user = await getServerUser();
   const canManage = user ? can(user.role, "cms:manage") : false;
-  const pages = await db.cmsPage.findMany({
+  const savedPages = await db.cmsPage.findMany({
     orderBy: { slug: "asc" },
   });
+  const pages = [...savedPages, ...Object.entries(contentPages).filter(([slug]) => !savedPages.some(page => page.slug === slug)).map(([slug, page]) => ({ id: `builtin-${slug}`, slug, ...page, isPublished: true, createdAt: new Date(POLICY_VERSION), updatedAt: new Date(POLICY_VERSION) }))];
   const faqs = await db.faqEntry.findMany({
     orderBy: { displayOrder: "asc" },
   });

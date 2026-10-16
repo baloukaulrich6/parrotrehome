@@ -1,3 +1,4 @@
+import { formatBirdAge } from "@/lib/bird-age";
 import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -106,7 +107,7 @@ export default async function AdminBirdsPage({
                     </div>
                     <div>
                       <p className="text-feather text-[10px] uppercase">Age</p>
-                      <p className="text-slate">{b.ageYears ? `${b.ageYears} yrs` : "—"}</p>
+                      <p className="text-slate">{formatBirdAge(b.ageYears)}</p>
                     </div>
                     <div>
                       <p className="text-feather text-[10px] uppercase">Sex</p>

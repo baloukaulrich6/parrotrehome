@@ -52,14 +52,14 @@ export function ParrotRehomeHeader({ settings = defaultSiteSettings }: { setting
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-9 items-center justify-between text-[12px] font-body">
             <div className="hidden md:flex items-center gap-3">
-              <span className="tracking-wide">Healthy Birds</span>
+              <span className="tracking-wide">Independent Breeders</span>
               <span className="text-feather">|</span>
-              <span className="tracking-wide">Ethical Breeding</span>
+              <span className="tracking-wide">Clear Purchase Terms</span>
               <span className="text-feather">|</span>
               <span className="tracking-wide">Worldwide Support</span>
             </div>
             <div className="md:hidden text-[11px] tracking-wide">
-              Healthy Birds · Ethical · Support
+              Independent Breeders · Ethical · Support
             </div>
             <div className="flex items-center gap-4">
               <Link

@@ -1,0 +1,11 @@
+# Public policies and young bird ages
+
+Built-in English content is in src/lib/policy-content.ts. /policies links to Terms, Payment, Refunds, Delivery, Privacy and Cookies. About and How It Works explain the Oregon coordination business and independent breeder locations. Existing CMS overrides remain authoritative. Admin > CMS shows both saved content and built-in pages; saving a built-in page creates an editable override. No migration or production seed is required.
+
+Approved refunds must be initiated within 5 business days; bank/provider posting is an additional indicative 3–10 business days. Acknowledgement and decision targets, cancellation steps, accessories returns and live-bird welfare complaints are described separately. Refunds remain an operational support process, not an automatic transfer triggered by canceling a request. Support must actually review and initiate refunds through the original provider. Mandatory rights remain applicable.
+
+Before publishing, the operator should verify its real legal seller identity, correspondence address, contact details, delivery capabilities and ability to honor these commitments. Configure those details in site settings; do not substitute placeholder addresses or claims of licensing. Have applicable Oregon and destination-state animal-sale obligations reviewed for the actual business. CMS edits can change terms; review existing overrides and keep purchase-specific written terms. New request audit records contain hashes and versions of the policies displayed at submission, not a replacement for retaining contract records.
+
+Optional Google tracking requires a browser choice. Cookie preferences in the footer reopen that choice; refusal is available without blocking checkout. Global Privacy Control prevents optional tracking. Withdrawal reloads the page and attempts to clear accessible Google cookies. Third-party fonts remain separate technical requests, disclosed in Privacy.
+
+Bird age remains stored as fractional years for compatibility. Admin entry supports weeks, months and years; public listings/details and admin lists format young birds in weeks/months. The public age filter includes under one year and unknown ages. Zero is a newborn age, distinct from missing information. No schema migration is needed.

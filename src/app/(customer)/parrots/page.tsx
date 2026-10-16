@@ -1,3 +1,4 @@
+import { formatBirdAge } from "@/lib/bird-age";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -15,6 +16,7 @@ type SearchParams = {
   location?: string;
   q?: string;
   sort?: string;
+  age?: string;
 };
 
 export default async function ParrotsPage({
@@ -36,10 +38,15 @@ export default async function ParrotsPage({
     ];
   }
 
-  let orderBy: Record<string, "asc" | "desc"> = { createdAt: "desc" };
+  if (sp.age === "under-1") where.ageYears = { gte: 0, lt: 1 };
+  if (sp.age === "1-5") where.ageYears = { gte: 1, lt: 5 };
+  if (sp.age === "5-plus") where.ageYears = { gte: 5 };
+  if (sp.age === "unknown") where.ageYears = null;
+
+  let orderBy: import("@prisma/client").Prisma.BirdOrderByWithRelationInput = { createdAt: "desc" };
   if (sp.sort === "price-asc") orderBy = { priceUsd: "asc" };
   if (sp.sort === "price-desc") orderBy = { priceUsd: "desc" };
-  if (sp.sort === "age-asc") orderBy = { ageYears: "asc" };
+  if (sp.sort === "age-asc") orderBy = { ageYears: { sort: "asc", nulls: "last" } };
 
   const birds = await db.bird.findMany({ where, orderBy });
   const allSpecies = await db.bird.findMany({
@@ -57,10 +64,7 @@ export default async function ParrotsPage({
             Meet our parrots
           </h1>
           <p className="text-feather text-[16px] font-body max-w-2xl leading-relaxed">
-            Each parrot is an individual with a verified dossier — provenance,
-            age, health records, and personality. We don&apos;t sell
-            &ldquo;quantities of stock&rdquo;; we help place specific, traceable
-            individuals.
+            Browse individual birds offered through independent breeders. Confirm the bird&apos;s current location, age, availability and available documentation before purchasing.
           </p>
         </div>
       </section>
@@ -128,6 +132,7 @@ export default async function ParrotsPage({
                     <option value="UNAVAILABLE">Unavailable</option>
                   </select>
                 </div>
+                <label className="block text-xs font-semibold text-feather">Age<select name="age" defaultValue={sp.age || ""} className="block mt-1 w-full h-10 rounded-md border bg-ivory px-2"><option value="">Any age</option><option value="under-1">Under 1 year</option><option value="1-5">1 to under 5 years</option><option value="5-plus">5 years and over</option><option value="unknown">Age not provided</option></select></label>
                 {/* Sort */}
                 <div>
                   <label htmlFor="sort" className="text-[12px] font-body font-semibold text-feather uppercase tracking-wide">
@@ -227,7 +232,7 @@ export default async function ParrotsPage({
                         </p>
                         <div className="flex items-center justify-between text-[13px] font-body border-t border-feather/15 pt-3">
                           <span className="text-feather flex items-center gap-1">
-                            <span className="font-semibold">{bird.ageYears ?? "—"} yrs</span>
+                            <span className="font-semibold">{formatBirdAge(bird.ageYears)}</span>
                             <span className="text-feather/60">·</span>
                             <span>{bird.sex ?? "Unknown"}</span>
                           </span>

@@ -1,3 +1,6 @@
+import { publicContent } from "@/lib/public-content";
+import { createHash } from "node:crypto";
+import { requiredPurchasePolicies } from "@/lib/policy-content";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -161,6 +164,13 @@ export async function POST(req: Request) {
       }
     }
 
+    const policies = await Promise.all(requiredPurchasePolicies.map(async (slug) => {
+      const page = await publicContent(slug);
+      return { slug, version: page?.version ?? "unpublished", digest: page ? createHash("sha256").update(page.title + "\n" + page.body).digest("hex") : null };
+    }));
+
+    if (policies.some((policy) => !policy.digest)) return NextResponse.json({ error: "Purchase policies are temporarily unavailable. Please contact support before ordering." }, { status: 409 });
+
     // Create request + items in a transaction (T-02 bird lock)
     const request = await db.$transaction(async (tx) => {
       if (selectedMethod && !await tx.paymentMethod.findFirst({ where: { id: selectedMethod.id, active: true } })) throw new Error("The selected payment method was disabled. Please refresh.");
@@ -230,7 +240,7 @@ export async function POST(req: Request) {
       objectType: "Request",
       objectId: request.id,
       action: "CREATE",
-      metadata: { reference, type, totalQuote, guest: !user },
+      metadata: { reference, type, totalQuote, guest: !user, policyAcknowledgement: { policies } },
     });
 
     // Build & send no-reply email (F-22)

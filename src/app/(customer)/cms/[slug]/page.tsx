@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { db } from "@/lib/db";
+import { publicContent } from "@/lib/public-content";
+import { PolicyLinks } from "@/components/parrotrehome/policy-links";
 import ReactMarkdown from "react-markdown";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -10,8 +11,8 @@ export default async function CmsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const page = await db.cmsPage.findUnique({ where: { slug } });
-  if (!page || !page.isPublished) return notFound();
+  const page = await publicContent(slug);
+  if (!page) return notFound();
 
   return (
     <div className="bg-ivory min-h-[60vh]">
@@ -27,9 +28,11 @@ export default async function CmsPage({
       </section>
       <section className="py-10 lg:py-14">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <p className="text-sm text-feather mb-6">Version: {page.version.slice(0, 10)}</p>
           <div className="prose prose-slate max-w-none prose-headings:font-heading prose-headings:text-slate prose-p:font-body prose-p:text-feather prose-p:leading-relaxed prose-h2:font-semibold prose-h2:text-[24px] prose-strong:text-slate prose-strong:font-semibold prose-a:text-tail-red hover:prose-a:text-tail-red-dark">
             <ReactMarkdown>{page.body}</ReactMarkdown>
           </div>
+          <div className="mt-8 border-t pt-6"><PolicyLinks /></div>
         </div>
       </section>
     </div>

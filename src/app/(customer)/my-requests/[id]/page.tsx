@@ -1,3 +1,5 @@
+import { PolicyLinks } from "@/components/parrotrehome/policy-links";
+import { mailConfiguration } from "@/lib/email-transport";
 import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -411,6 +413,8 @@ export default async function RequestDetailPage({
             >
               <FileText className="h-4 w-4" aria-hidden /> Download recap (PDF)
             </a>
+
+            <section className="bg-white border rounded-xl p-5 space-y-3"><h2 className="font-heading text-lg">Cancellation or refund help</h2><p className="text-sm text-feather">Use the cancellation action for an eligible pending request. If you have paid or need a refund, contact support with this reference. Canceling here does not automatically transfer money.</p><a className="text-forest underline text-sm" href={`mailto:${mailConfiguration().replyTo}?subject=${encodeURIComponent(`Refund request — ${request.reference}`)}`}>Request cancellation or refund by email</a><PolicyLinks /></section>
 
             {/* Customer-side cancel within policy (F-27 + Cahier p.07) */}
             <CustomerCancelRequestButton requestId={request.id} currentStatus={request.status} />
