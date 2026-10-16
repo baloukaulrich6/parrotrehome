@@ -79,8 +79,10 @@ export function CreateInstructionsForm({
   paymentMethods,
   totalUsd,
   reference,
+  supportEmail = "support@parrotrehome.com",
 }: {
   requestId: string;
+  supportEmail?: string;
   paymentMethod: { id: string; name: string; instructionsTemplate: string; officialProvider: string } | null;
   paymentMethods: { id: string; name: string; instructionsTemplate: string; officialProvider: string }[];
   totalUsd: number;
@@ -91,6 +93,7 @@ export function CreateInstructionsForm({
   const [methodId, setMethodId] = useState(initial?.id || "");
   const format = (text: string) => text.replaceAll("{{requestReference}}", reference).replaceAll("{{totalQuoteUsd}}", totalUsd.toFixed(2));
   const [body, setBody] = useState(format(initial?.instructionsTemplate || ""));
+  const [validityMinutes, setValidityMinutes] = useState(20);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -104,7 +107,7 @@ export function CreateInstructionsForm({
       const res = await fetch(`/api/admin/requests/${requestId}/instructions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: body.trim(), paymentMethodId: methodId }),
+        body: JSON.stringify({ body: body.trim(), paymentMethodId: methodId, validityMinutes }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
@@ -123,7 +126,7 @@ export function CreateInstructionsForm({
         <Lock className="h-3.5 w-3.5 text-iris" aria-hidden /> Email payment instructions
       </p>
       <p className="text-[12px] text-feather font-body mb-2">
-        Review the payment details below. They will be available through a personal link valid for 20 minutes.
+        Review the payment details below. They will be sent directly in the customer’s email. No payment link is required.
       </p>
       <label className="block text-sm mb-3">Payment method<select aria-label="Payment method" value={methodId} onChange={event => { setMethodId(event.target.value); setBody(format(paymentMethods.find(method => method.id === event.target.value)?.instructionsTemplate || "")); }} className="block w-full rounded-md border p-2 mt-1"><option value="">Choose an active method</option>{paymentMethods.map(method => <option key={method.id} value={method.id}>{method.name}</option>)}</select></label>
       {!paymentMethods.length && <p className="text-tail-red text-sm">Activate a method in Payment methods before sending.</p>}
@@ -135,18 +138,20 @@ export function CreateInstructionsForm({
         rows={8}
         className="w-full px-2 py-2 rounded-md border border-feather/30 bg-white text-[12px] font-body focus-ring"
       />
-      <p className="mt-2 text-xs text-feather">Valid for 20 minutes from issue. Review and update the payment details for this request before sending.</p>
+      <label className="block text-sm mt-3">Validity (minutes)<input type="number" min={1} max={1440} step={1} value={validityMinutes} onChange={event => setValidityMinutes(Number(event.target.value))} className="block border rounded-md p-2 mt-1 w-full" /></label>
+      <label className="block text-sm mt-3">Support email<input type="email" value={supportEmail} readOnly className="block border rounded-md p-2 mt-1 w-full" /></label>
+      <p className="mt-2 text-xs text-feather">Check the method, recipient, amount and validity before sending. Emailed bank or payment details cannot be removed from the recipient’s inbox after expiry.</p>
       <button
         type="button"
         onClick={submit}
-        disabled={submitting || !methodId || body.trim().length < 20}
+        disabled={submitting || !methodId || body.trim().length < 20 || !Number.isInteger(validityMinutes) || validityMinutes < 1 || validityMinutes > 1440}
         className="mt-2 w-full h-9 rounded-md bg-iris hover:bg-iris-dark text-slate text-[13px] font-body font-semibold inline-flex items-center justify-center gap-2 disabled:bg-feather/40"
       >
         {submitting ? <Clock className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         Email instructions to customer
       </button>
       <p className="text-[11px] text-feather font-body mt-2">
-        A non-guessable, signed link will be generated. The customer receives an agent-signed email.
+        The customer receives the payment details, expiry time and support address in the email itself.
       </p>
     </div>
   );
@@ -164,6 +169,7 @@ export function VerifyPaymentForm({
   customerReference?: string | null;
 }) {
   const router = useRouter();
+  const [confirmationReference, setConfirmationReference] = useState(customerReference || "");
   const [verifiedAmount, setVerifiedAmount] = useState(amount.toFixed(2));
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -176,13 +182,13 @@ export function VerifyPaymentForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: Number(verifiedAmount),
-          reference: customerReference ?? reference,
+          reference: confirmationReference.trim(),
           notes: notes.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      toast.success("Payment verified — audit trail updated.");
+      toast.success(data.status === "PENDING_APPROVAL" ? "Payment submitted for second approval; not yet confirmed." : "Payment verified — audit trail updated.");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -201,6 +207,7 @@ export function VerifyPaymentForm({
           Customer reference: <code className="bg-ivory px-1 rounded text-[11px]">{customerReference}</code>
         </p>
       )}
+      <label className="block text-sm mb-3">Payment confirmation reference (email or client submission)<input value={confirmationReference} maxLength={200} onChange={event => setConfirmationReference(event.target.value)} className="block border rounded-md p-2 w-full mt-1" /></label>
       <label className="text-[11px] font-body font-semibold text-feather">Verified amount (USD)</label>
       <input
         type="number"
@@ -220,7 +227,7 @@ export function VerifyPaymentForm({
       <button
         type="button"
         onClick={submit}
-        disabled={submitting}
+        disabled={submitting || !confirmationReference.trim()}
         className="mt-2 w-full h-9 rounded-md bg-forest hover:bg-forest-dark text-white text-[13px] font-body font-semibold inline-flex items-center justify-center gap-2 disabled:bg-feather/40"
       >
         {submitting ? <Clock className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}

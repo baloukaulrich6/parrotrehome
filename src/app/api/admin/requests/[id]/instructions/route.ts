@@ -1,3 +1,4 @@
+import { mailConfiguration } from "@/lib/email-transport";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -18,6 +19,7 @@ import { z } from "zod";
 // Only an authorized agent can publish; expiration is effectively controlled.
 
 const schema = z.object({
+  validityMinutes: z.number().int().min(1).max(1440).default(20),
   paymentMethodId: z.string().min(1).optional(),
   body: z.string().min(20, "Instructions body is too short").max(5000),
 });
@@ -71,7 +73,7 @@ export async function POST(
 
     // T-04: generate non-guessable secure link hash
     const secureLinkHash = generateSecureLinkHash();
-    const expiryAt = paymentExpiry();
+    const expiryAt = paymentExpiry(Date.now(), parsed.data.validityMinutes);
 
     // Publish a new version and revoke the old link atomically.
     const instruction = await db.$transaction(async (tx) => {
@@ -123,6 +125,9 @@ export async function POST(
       agentRole: user.role.replace(/_/g, " ").toLowerCase(),
       secureLink,
       expiryAt,
+      validityMinutes: parsed.data.validityMinutes,
+      paymentDetails: parsed.data.body,
+      supportEmail: mailConfiguration().replyTo,
       paymentMethodName: paymentMethod.name,
       totalUsd: request.totalQuoteUsd == null ? null : Number(request.finalTotalUsd ?? request.totalQuoteUsd),
     });

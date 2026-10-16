@@ -12,22 +12,23 @@ export const defaultEmailTemplates = {
     subject: "{{paymentLabel}} payment instructions — Request #{{reference}}",
     body: `Dear {{customerName}},
 
-Your request #{{reference}} is ready for the next step. {{agentName}} has prepared your {{paymentLabel}} payment instructions.
+We have reviewed request #{{reference}}. {{agentName}} has prepared the details for your selected payment method.
 
 Request reference: {{reference}}
-Selected payment method: {{selectedMethod}}
+Payment method: {{selectedMethod}}
 Amount: {{amount}}
 
-Review the current payment details using your personal link:
-{{secureLink}}
+PAYMENT DETAILS
+{{paymentDetails}}
 
-These instructions are valid for 20 minutes from issue, until {{expiry}}. Please check the recipient, amount and reference before paying. Use only the details shown in this link; they may change when new instructions are issued.
+VALIDITY
+These payment instructions are valid for {{validityMinutes}} minutes from issue, until {{expiry}}. Check the recipient, amount and reference before paying. After this time, do not use the old details; contact our team for current instructions. Your client account remains accessible.
 
-If the link has expired, do not pay using the old details. Ask your agent for a new link through My Requests. Your client account will remain accessible.
+AFTER PAYMENT
+Reply to this email with your payment confirmation reference so our team can verify it. If you have already paid, do not send a second payment. Sending a reference does not confirm payment until our team verifies receipt.
 
-After payment, submit the confirmation reference in My Requests. Our team will check it with the payment provider before confirming your order. Opening this link does not confirm payment.
-
-Need help? Contact your assigned agent through the messaging section of your request. Never send passwords or card numbers by email.
+NEED HELP?
+Reply to this email or contact {{supportEmail}}. Never send your password, card number or online banking login details.
 
 Thank you for choosing ParrotRehome.
 The ParrotRehome team`,
@@ -36,16 +37,16 @@ The ParrotRehome team`,
     subject: "Payment instructions expiring soon — Request #{{reference}}",
     body: `Dear {{customerName}},
 
-We have not yet received a payment confirmation reference for request #{{reference}}. The current {{paymentLabel}} payment instructions expire at {{expiry}}.
+We have not yet received a payment confirmation reference for request #{{reference}}. The {{paymentLabel}} instructions below expire at {{expiry}}.
 
-If you have already paid, please do not pay again. Submit your payment reference through My Requests so our team can verify it.
+PAYMENT DETAILS
+{{paymentDetails}}
 
-If you still wish to proceed, review your current payment instructions here before making a payment:
-{{secureLink}}
+If you have already paid, do not pay again. Reply to this email with your payment reference so our team can verify it.
 
-If the instructions expire, do not use the old payment details. Contact your agent for new instructions. Your account remains accessible.
+If you have not paid and still wish to proceed, check the recipient, amount and reference before using the current instructions. After expiry, do not use these details; contact {{supportEmail}} for updated instructions. Your account remains accessible.
 
-Need help? Reply to this email or use your request conversation.
+Need help? Reply to this email or contact {{supportEmail}}.
 The ParrotRehome team`,
   },
   "payment-reference-received": {
@@ -93,14 +94,21 @@ The ParrotRehome team`,
 } as const;
 export type EditableEmailTemplate = keyof typeof defaultEmailTemplates;
 export type EmailTemplateContent = { subject: string; body: string };
-export const emailVariables = ["customerName", "reference", "message", "paymentLabel", "selectedMethod", "agentName", "expiry", "secureLink", "amount"];
+export const emailVariables = ["customerName", "reference", "message", "paymentLabel", "selectedMethod", "agentName", "expiry", "secureLink", "amount", "paymentDetails", "validityMinutes", "supportEmail"];
 const location = () => path.resolve(process.env.EMAIL_TEMPLATES_FILE || "var/email-templates.json");
 
 export function readEmailTemplates(): Record<EditableEmailTemplate, EmailTemplateContent> {
   let overrides: Partial<Record<EditableEmailTemplate, EmailTemplateContent>> = {};
   try { overrides = JSON.parse(readFileSync(location(), "utf8")); }
   catch (err) { if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err; }
-  return { ...defaultEmailTemplates, ...overrides };
+  const templates = { ...defaultEmailTemplates, ...overrides };
+  // Upgrade link-only payment templates from installed versions to direct-detail emails.
+  for (const name of ["instructions-ready", "payment-reminder"] as const) {
+    if (!templates[name].body.includes("{{paymentDetails}}") || templates[name].body.includes("{{secureLink}}")) {
+      templates[name] = { ...templates[name], body: defaultEmailTemplates[name].body };
+    }
+  }
+  return templates;
 }
 
 export function saveEmailTemplate(name: EditableEmailTemplate, content: EmailTemplateContent) {

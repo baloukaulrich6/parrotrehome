@@ -3,7 +3,7 @@
 ## Parcours disponible
 
 - Une demande créée déclenche un accusé de réception client. Si `MAIL_ORDER_NOTIFY` est renseigné, l’équipe reçoit aussi une notification avec un lien vers le dossier.
-- L’agent prépare les détails de paiement dans le dossier. L’envoi des instructions crée un lien CHMK valable 20 minutes et déclenche le mail client. Les détails sensibles restent dans le lien personnel.
+- L’agent prépare les détails de paiement dans le dossier. L’envoi transmet directement les coordonnées de la méthode choisie dans l’email, avec une durée saisie par l’agent (20 minutes par défaut, de 1 minute à 24 heures) et l’adresse support. Aucun clic sur un lien de paiement n’est nécessaire.
 - Une référence de paiement déposée par le client déclenche un accusé de réception précisant que la vérification est en cours.
 - Le mail « Payment verified » part après validation par le personnel autorisé. Pour les paiements nécessitant une seconde approbation, il part après cette approbation. Resend ne permet pas de vérifier un paiement : cette étape reste manuelle tant qu’aucun prestataire de paiement n’est connecté.
 - Une réponse du personnel dans la conversation d’un dossier déclenche un email au client.
@@ -41,7 +41,7 @@ CRON_SECRET=
 
 `MAIL_REPLY_DOMAIN` doit correspondre au domaine où la réception est réellement activée. Si vous choisissez le sous-domaine, utiliser `MAIL_REPLY_DOMAIN=reply.parrotrehome.com` et une adresse de réponse générique valide sur ce sous-domaine, par exemple `MAIL_REPLY_TO=support@reply.parrotrehome.com`.
 
-Les emails de commande utilisent automatiquement une adresse de réponse signée, propre au dossier. Les réponses envoyées depuis la boîte Support utilisent une adresse signée propre à la conversation. Le client n’a pas à saisir ces adresses : son bouton Répondre les utilise.
+En mode de réception Resend, les emails de conversation peuvent utiliser une adresse de réponse signée, propre au dossier. Les instructions de paiement utilisent directement l’adresse support configurée dans `MAIL_REPLY_TO`. Les réponses envoyées depuis la boîte Support utilisent une adresse signée propre à la conversation. Le client n’a pas à saisir ces adresses : son bouton Répondre les utilise.
 
 Après modification du fichier, recréer le service :
 
@@ -81,8 +81,8 @@ Les modèles de rendez-vous existants continuent à utiliser le transport commun
 ## Vérification réelle après activation
 
 - Créer une demande avec une adresse de test qui vous appartient et vérifier l’accusé de réception dans la boîte destinataire et dans Resend.
-- Envoyer des instructions depuis le dossier et vérifier l’email, son lien et son expiration de 20 minutes.
-- Répondre à cet email ; vérifier l’arrivée dans **Support inbox** et dans le dossier. Répondre depuis l’administration et vérifier le retour dans la boîte client.
+- Envoyer des instructions depuis le dossier et vérifier la présence des coordonnées dans l’email, de la durée choisie, de l’échéance et de l’adresse support.
+- Répondre à un email de conversation signé ; en mode Resend, vérifier l’arrivée dans **Support inbox** et dans le dossier. Les réponses aux instructions de paiement vont à l’adresse support configurée. Répondre depuis l’administration et vérifier le retour dans la boîte client.
 - Envoyer directement un email à l’adresse support du domaine de réception ; vérifier qu’il apparaît comme conversation indépendante.
 - Vérifier qu’aucun email de paiement confirmé ne part avant la validation du paiement.
 
@@ -122,7 +122,7 @@ Ne pas activer ce mode si le domaine est reçu seulement par Zoho ou par des rè
 
 Le choix du moyen actif est disponible dès le formulaire de commande, puis dans le dossier client au statut Reçue si aucun choix n’a encore été fait. Une seule méthode active est présélectionnée. Le moyen enregistré est affiché dans le dossier et dans l’accusé de réception. Les instructions confidentielles restent exclues du catalogue public des méthodes.
 
-Dans Administration → Requests → ouvrir le dossier → Actions → **Email payment instructions**, choisir une méthode active, vérifier les informations du destinataire et de paiement dans le texte, puis cliquer **Email instructions to customer**. Cette action est disponible dès la réception pour les rôles autorisés ; un agent reste limité à ses dossiers affectés. Le serveur refuse une méthode désactivée. L’email reprend le nom réel de la méthode choisie, par exemple ZELLE. Aucun paiement n’est confirmé par cette action.
+Dans Administration → Requests → ouvrir le dossier → Actions → **Email payment instructions**, choisir une méthode active, vérifier les informations du destinataire et de paiement dans le texte, puis cliquer **Email instructions to customer**. Cette action est disponible dès la réception pour les rôles autorisés ; un agent reste limité à ses dossiers affectés. Le serveur refuse une méthode désactivée. Saisir également la durée de validité : les coordonnées sont intégrées directement à l’email. L’email reprend le nom réel de la méthode choisie, par exemple ZELLE. Aucun paiement n’est confirmé par cette action.
 
 ### Rejet Cloudflare « Upstream error »
 

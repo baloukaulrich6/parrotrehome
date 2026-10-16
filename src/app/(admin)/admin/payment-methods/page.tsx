@@ -28,6 +28,8 @@ export default async function AdminPaymentMethodsPage() {
         </p>
       </div>
 
+      {canConfigure && <section className="bg-white border border-feather/20 rounded-xl p-5"><h2 className="font-heading text-xl">New payment method</h2><p className="text-sm text-feather">Add Zelle, a bank transfer or another authorized method. Each method has its own payment information template.</p><PaymentMethodEditor /></section>}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {methods.map((m) => (
           <article key={m.id} className="bg-white rounded-xl border border-feather/20 p-5">

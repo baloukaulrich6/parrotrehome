@@ -23,6 +23,7 @@ export interface EmailPayload {
   subject: string;
   body: string;
   html?: string;
+  replyTo?: string;
   eventId?: string;
 }
 
@@ -54,7 +55,7 @@ export async function sendEmail(payload: EmailPayload): Promise<{ messageId: str
   let errorMessage: string | undefined;
 
   try {
-    status = await deliverEmail({ ...payload, replyTo: payload.template === "staff-order-received" ? undefined : customerReplyAddress("request", payload.requestId) }, key);
+    status = await deliverEmail({ ...payload, replyTo: payload.replyTo || (payload.template === "staff-order-received" ? undefined : customerReplyAddress("request", payload.requestId)) }, key);
 
   } catch (err) {
     status = "FAILED";
@@ -83,6 +84,7 @@ export function buildRequestReceivedEmail(opts: {
   itemsSummary: string;
   totalQuote: number | null;
   paymentMethodName?: string;
+  customerDetails?: string;
   nextSteps: string[];
 }): EmailPayload {
   const body = `Dear ${opts.customerName},
@@ -94,12 +96,15 @@ Reference: ${opts.reference}
 Payment preference: ${opts.paymentMethodName || "To be confirmed with your agent"}
 Items:
 ${opts.itemsSummary}
+
+YOUR DETAILS
+${opts.customerDetails || `Name: ${opts.customerName}\nEmail: ${opts.customerEmail}`}
 ${opts.totalQuote != null ? `\nEstimated total: $${opts.totalQuote.toFixed(2)} USD` : ""}
 
 NEXT STEPS
 ${opts.nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
-Important: ParrotRehome never collects payment information on-site. One of our authorized agents will reach out with secure, traceable payment instructions.
+Important: ParrotRehome never collects payment information on-site. One of our authorized agents will email the payment details and their validity period.
 
 Thank you for choosing responsible avian companionship.
 
@@ -127,6 +132,9 @@ export function buildInstructionsReadyEmail(opts: {
   secureLink: string;
   expiryAt: Date;
   paymentMethodName?: string;
+  paymentDetails: string;
+  validityMinutes?: number;
+  supportEmail?: string;
   totalUsd?: number | null;
 }): EmailPayload {
   const expiry = opts.expiryAt.toLocaleString("en-US", {
@@ -140,6 +148,9 @@ export function buildInstructionsReadyEmail(opts: {
     paymentLabel: method,
     selectedMethod: opts.paymentMethodName || method,
     agentName: opts.agentName,
+    paymentDetails: opts.paymentDetails,
+    validityMinutes: String(opts.validityMinutes ?? 20),
+    supportEmail: opts.supportEmail || mailConfiguration().replyTo,
     expiry: expiry,
     secureLink: opts.secureLink,
     amount: opts.totalUsd == null ? "See the amount in your request" : `$${opts.totalUsd.toFixed(2)} USD`,
@@ -148,6 +159,7 @@ export function buildInstructionsReadyEmail(opts: {
     requestId: "",
     senderRole: `agent:${opts.agentName}`,
     template: "instructions-ready",
+    replyTo: opts.supportEmail || mailConfiguration().replyTo,
     toAddress: opts.customerEmail,
     fromAddress: NO_REPLY, // domain-authenticated no-reply, but signed in body
     ...content,
@@ -383,7 +395,7 @@ export async function sendPaymentReminders(now = new Date()) {
   for (const instruction of instructions) {
     const request = instruction.request;
     const result = await sendEmail({ requestId: request.id, template: "payment-reminder", senderRole: "system", toAddress: request.customerEmail, fromAddress: mailConfiguration().from, eventId: instruction.id,
-      ...resolveEmailTemplate("payment-reminder", { customerName: request.customerName, reference: request.reference, paymentLabel: request.selectedPaymentMethod?.name || "Selected method", expiry: instruction.expiryAt.toISOString(), secureLink: buildSecureInstructionsLink(process.env.NEXTAUTH_URL || "http://localhost:3000", instruction.secureLinkHash) }),
+      ...resolveEmailTemplate("payment-reminder", { customerName: request.customerName, reference: request.reference, paymentDetails: instruction.body, supportEmail: mailConfiguration().replyTo, paymentLabel: request.selectedPaymentMethod?.name || "Selected method", expiry: instruction.expiryAt.toISOString(), secureLink: buildSecureInstructionsLink(process.env.NEXTAUTH_URL || "http://localhost:3000", instruction.secureLinkHash) }),
     });
     if (result.status === "SENT") sent++;
   }

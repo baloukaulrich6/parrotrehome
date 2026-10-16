@@ -37,13 +37,22 @@ test("email HTML escapes client text and uses the brand palette", () => {
   expect(html).toContain("#47745B");
   expect(escapeHtml('"')).toBe("&quot;");
 });
-test("payment template provides deadline, support and accurate confirmation wording", () => {
-  const email = resolveEmailTemplate("instructions-ready", { customerName: "Alex", reference: "DEMO-001", paymentLabel: "CHMK", selectedMethod: "CHMK", agentName: "Agent", expiry: "12:20 UTC", secureLink: "https://example.com/payment", amount: "$250.00 USD" });
-  expect(email.body).toContain("20 minutes");
-  expect(email.body).toContain("12:20 UTC");
-  expect(email.body).toContain("Your client account will remain accessible");
+test("payment emails contain details, configurable validity and support without a payment link", () => {
+  const email = resolveEmailTemplate("instructions-ready", { customerName: "Alex", reference: "DEMO-001", paymentLabel: "Zelle", selectedMethod: "Zelle", agentName: "Agent", expiry: "12:30 UTC", paymentDetails: "Recipient: Demo Company\nContact: payments@example.com", validityMinutes: "30", supportEmail: "support@parrotrehome.com", amount: "$250.00 USD" });
+  expect(email.body).toContain("30 minutes");
+  expect(email.body).toContain("12:30 UTC");
+  expect(email.body).toContain("Recipient: Demo Company");
+  expect(email.html).toContain('href="mailto:support@parrotrehome.com"');
+  expect(email.body).not.toContain("https://");
   expect(email.body).toContain("does not confirm payment");
-  expect(email.subject).toContain("CHMK");
+  expect(email.subject).toContain("Zelle");
+});
+test("installed link-only payment templates upgrade to direct details", () => {
+  saveEmailTemplate("instructions-ready", { subject: "Instructions {{reference}}", body: "Follow {{secureLink}} before {{expiry}}." });
+  const email = resolveEmailTemplate("instructions-ready", { reference: "NEW", paymentDetails: "Recipient: Demo account", validityMinutes: "45", supportEmail: "support@parrotrehome.com", expiry: "Tomorrow" });
+  expect(email.body).toContain("Recipient: Demo account");
+  expect(email.body).toContain("45 minutes");
+  expect(email.body).not.toContain("Follow");
 });
 test("saved template is used by the next email and user text remains escaped", () => {
   saveEmailTemplate("request-received", { subject: "Request {{reference}}", body: "Hello {{customerName}},\n{{message}}" });

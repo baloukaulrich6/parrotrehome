@@ -22,6 +22,7 @@ export async function PATCH(
     if (!can(user.role, "payment:configure")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    if (req.headers.get("origin") !== new URL(process.env.NEXTAUTH_URL || req.url).origin) return new Response(null, { status: 403 });
     const { id } = await params;
     const body = await req.json();
     const parsed = schema.safeParse(body);

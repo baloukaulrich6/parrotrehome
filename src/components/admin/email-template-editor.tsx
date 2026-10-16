@@ -11,6 +11,7 @@ export function EmailTemplateEditor({ name, initial, canEdit }: {
   const [body, setBody] = useState(initial.body);
   const [saving, setSaving] = useState(false);
   const variables: Record<string, string> = {
+    paymentDetails: "Recipient: DEMO — replace with verified details\nPayment reference: DEMO-001\nAmount: $250.00 USD", validityMinutes: "30", supportEmail: "support@parrotrehome.com",
     customerName: "Alex Morgan", reference: "DEMO-001", paymentLabel: "CHMK", selectedMethod: "CHMK",
     agentName: "Your ParrotRehome agent", amount: "$250.00 USD", expiry: "20 minutes after issue (UTC)",
     secureLink: "https://example.com/demo-payment", message: "Dear Alex,\n\nWe have received your request #DEMO-001. Our team will review availability and contact you with the next steps. No payment is confirmed yet.\n\nThank you,\nThe ParrotRehome team",

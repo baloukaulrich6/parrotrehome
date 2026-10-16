@@ -239,7 +239,7 @@ export async function POST(req: Request) {
       .join("\n");
     const nextSteps = [
       "An authorized agent reviews your request and assigns a dossier.",
-      "You receive an email with available payment methods and a secure, traceable link.",
+      "Your agent emails the details for your selected payment method and the time until which they are valid.",
       "After your payment is manually verified, your request moves to fulfillment.",
     ];
     const emailPayload = buildRequestReceivedEmail({
@@ -249,6 +249,7 @@ export async function POST(req: Request) {
       itemsSummary,
       totalQuote: finalTotalUsd ?? totalQuote,
       paymentMethodName: selectedMethod?.name,
+      customerDetails: `Name: ${data.customerName}\nEmail: ${data.customerEmail}\nPhone: ${data.customerPhone || "Not provided"}\nAddress: ${data.shippingAddress || "Not provided"}\nState: ${data.shippingState}\nExperience: ${data.experience || "Not provided"}\nHabitat: ${data.habitat || "Not provided"}\nPreferences: ${data.preferences || "None"}`,
       nextSteps,
     });
     emailPayload.requestId = request.id;

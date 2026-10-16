@@ -143,11 +143,21 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     expect(await db.message.count({ where: { requestId: dossier.id, template: "payment-reminder" } })).toBe(1);
     // Active methods are visible immediately and the selection survives checkout.
     await db.servedState.create({ data: { code: "CA", name: "California", allowsBirdDelivery: true } });
-    const zelle = await db.paymentMethod.create({ data: { name: "ZELLE", officialProvider: "Zelle", active: true, instructionsTemplate: "Pay the reviewed amount for {{requestReference}} using the confirmed recipient details." } });
+    const methodPayload = { name: "ZELLE", officialProvider: "Zelle", active: true, instructionsTemplate: "Pay the reviewed amount for {{requestReference}} using the confirmed recipient details." };
+    expect((await new Client().request("/api/admin/payment-methods", methodPayload, "POST")).status).toBe(401);
+    expect((await client.request("/api/admin/payment-methods", methodPayload, "POST")).status).toBe(403);
+    const createdZelle = await admin.request("/api/admin/payment-methods", methodPayload, "POST");
+    expect(createdZelle.status).toBe(201);
+    const zelle = await createdZelle.json();
+    const createdWire = await admin.request("/api/admin/payment-methods", { ...methodPayload, name: "Bank transfer", officialProvider: "Demo Bank", instructionsTemplate: "Beneficiary: verified company\nAccount: supplied by the agent\nReference: {{requestReference}}" }, "POST");
+    expect(createdWire.status).toBe(201);
+    const methodsPage = await admin.request("/admin/payment-methods");
+    expect(await methodsPage.text()).toContain("New payment method");
     const inactive = await db.paymentMethod.create({ data: { name: "Hidden method", officialProvider: "Other", active: false, instructionsTemplate: "Not public" } });
     const methodsResponse = await new Client().request("/api/payment-methods");
     const methodList = (await methodsResponse.json()).methods;
     expect(methodList.map((method: { name: string }) => method.name)).toContain("ZELLE");
+    expect(methodList.map((method: { name: string }) => method.name)).toContain("Bank transfer");
     expect(methodList.map((method: { name: string }) => method.name)).not.toContain("Hidden method");
     expect(JSON.stringify(methodList)).not.toContain("instructionsTemplate");
     const waiting = await db.request.create({ data: { reference: "EARLY-METHOD-001", type: "PARROT_PURCHASE", status: "RECEIVED", shippingState: "CA", customerName: "HTTP Client", customerEmail: "client@example.com" } });
@@ -169,14 +179,27 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     for (const value of [order.customerEmail, order.customerPhone, order.shippingAddress, order.habitat, order.preferences]) expect(teamEmail.body).toContain(value);
     const adminOrderHtml = await (await admin.request(`/admin/requests/${createdOrder.requestId}`)).text();
     expect(adminOrderHtml).toContain("Email instructions to customer");
-    const instructions = { body: "Zelle instructions reviewed for this request. Use the recipient supplied by your agent.", paymentMethodId: zelle.id };
+    const instructions = { body: "Zelle recipient: Demo Company. Payment reference: client request. Amount: USD 900.", paymentMethodId: zelle.id, validityMinutes: 45 };
+    expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, { ...instructions, validityMinutes: 0 }, "POST")).status).toBe(400);
     expect((await client.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, instructions, "POST")).status).toBe(403);
     expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, instructions, "POST")).status).toBe(200);
     const paymentEmail = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "instructions-ready" } });
     expect(paymentEmail.subject).toContain("ZELLE"); expect(paymentEmail.body).toContain("ZELLE");
+    expect(paymentEmail.body).toContain(instructions.body);
+    expect(paymentEmail.body).toContain("45 minutes");
+    expect(paymentEmail.body).toContain("support@parrotrehome.com");
+    expect(paymentEmail.body).not.toContain("/my-requests/instructions?token=");
+    const issued = await db.paymentInstruction.findFirstOrThrow({ where: { requestId: createdOrder.requestId }, orderBy: { createdAt: "desc" } });
+    expect(Math.abs(issued.expiryAt.getTime() - issued.createdAt.getTime() - 45 * 60000)).toBeLessThan(3000);
+    expect(acknowledgement.body).toContain(order.customerPhone);
+    expect(acknowledgement.body).toContain(order.shippingAddress);
     expect((await db.request.findUniqueOrThrow({ where: { id: createdOrder.requestId } })).status).toBe("INSTRUCTIONS_SENT");
     await db.paymentMethod.update({ where: { id: zelle.id }, data: { active: false } });
     expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/instructions`, instructions, "POST")).status).toBe(400);
+    // A client can reply by email: staff records the reference after provider verification.
+    expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/verify`, { amount: 900 }, "POST")).status).toBe(400);
+    expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/verify`, { amount: 900, reference: "EMAIL-CONFIRMATION-900" }, "POST")).status).toBe(200);
+    expect((await db.request.findUniqueOrThrow({ where: { id: createdOrder.requestId } })).status).toBe("PAID_VERIFIED");
     // A password change always targets the signed-in account, and revokes old sessions.
     expect((await new Client().request("/api/account/password", {}, "PUT")).status).toBe(401);
     const newPassword = "New-local-password-only-12345";

@@ -10,7 +10,17 @@ export function renderEmailHtml(subject: string, body: string, siteUrl = "https:
     if (["https:", "http:"].includes(url.protocol)) logoUrl = url.href;
   } catch { /* Keep the production asset URL for invalid configuration. */ }
   // Explicit paragraphs and line breaks survive Outlook, which may ignore white-space CSS.
-  const linked = (value: string) => escapeHtml(value).replace(/https?:\/\/[^\s<>]+/g, url => `<a href="${url}" style="color:#47745B;text-decoration:underline;word-break:break-all">${url}</a>`);
+  const linked = (value: string) => {
+    const matches = value.matchAll(/https?:\/\/[^\s<>]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+    let html = "", offset = 0;
+    for (const match of matches) {
+      html += escapeHtml(value.slice(offset, match.index));
+      const href = match[0].includes("://") ? match[0] : `mailto:${match[0]}`;
+      html += `<a href="${escapeHtml(href)}" style="color:#47745B;text-decoration:underline;word-break:break-all">${escapeHtml(match[0])}</a>`;
+      offset = match.index! + match[0].length;
+    }
+    return html + escapeHtml(value.slice(offset));
+  };
   const content = body.replace(/\r\n/g, "\n").split(/\n\s*\n/).map(paragraph =>
     `<p style="margin:0 0 18px;font-size:15px;line-height:1.7">${linked(paragraph).replace(/\n/g, "<br>")}</p>`
   ).join("");

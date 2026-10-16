@@ -16,7 +16,7 @@ import { z } from "zod";
 
 const schema = z.object({
   amount: z.number().positive(),
-  reference: z.string().optional(),
+  reference: z.string().trim().min(1).max(200).optional(),
   notes: z.string().max(1000).optional(),
 });
 
@@ -41,8 +41,17 @@ export async function POST(
       );
     }
 
-    const request = await db.request.findUnique({ where: { id } });
+    let request = await db.request.findUnique({ where: { id } });
     if (!request) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // An authorized staff member can record a reference received by email.
+    if (request.status === "INSTRUCTIONS_SENT") {
+      if (!parsed.data.reference) return NextResponse.json({ error: "Enter the payment confirmation reference received from the client." }, { status: 400 });
+      const recorded = await db.request.updateMany({ where: { id, status: "INSTRUCTIONS_SENT" }, data: { status: "PAYMENT_TO_VERIFY", paymentReference: parsed.data.reference } });
+      if (!recorded.count) return NextResponse.json({ error: "Request changed. Refresh before verifying." }, { status: 409 });
+      await auditLog.requestStatusChange(user.id, user.role, id, "INSTRUCTIONS_SENT", "PAYMENT_TO_VERIFY", { source: "STAFF_RECORDED_REFERENCE" });
+      request = { ...request, status: "PAYMENT_TO_VERIFY", paymentReference: parsed.data.reference };
+    }
 
     if (request.status !== "PAYMENT_TO_VERIFY") {
       return NextResponse.json(
@@ -102,6 +111,8 @@ export async function POST(
 
     // Transaction: payment check + status update + audit
     await db.$transaction(async (tx) => {
+      const changed = await tx.request.updateMany({ where: { id, status: "PAYMENT_TO_VERIFY" }, data: { status: newStatus, paidAt: new Date() } });
+      if (!changed.count) throw new Error("Request changed. Refresh before verifying payment.");
       await tx.paymentCheck.create({
         data: {
           requestId: id,
@@ -112,10 +123,7 @@ export async function POST(
         },
       });
 
-      await tx.request.update({
-        where: { id },
-        data: { status: newStatus, paidAt: new Date() },
-      });
+
     });
 
     await auditLog.paymentVerify(

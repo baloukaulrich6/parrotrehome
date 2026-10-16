@@ -1,3 +1,4 @@
+import { mailConfiguration } from "@/lib/email-transport";
 import { requireStaffPage } from "@/lib/staff-page";
 import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
 import Link from "next/link";
@@ -388,6 +389,7 @@ export default async function DossierPage({
                 requestId={request.id}
                 paymentMethod={request.selectedPaymentMethod}
                 paymentMethods={paymentMethods}
+                supportEmail={mailConfiguration().replyTo}
                 totalUsd={Number(request.finalTotalUsd ?? request.totalQuoteUsd ?? 0)}
                 reference={request.reference}
               />
@@ -409,10 +411,10 @@ export default async function DossierPage({
             )}
 
             {/* Verify payment */}
-            {canVerify && request.status === "PAYMENT_TO_VERIFY" && (
+            {canVerify && ["INSTRUCTIONS_SENT", "PAYMENT_TO_VERIFY"].includes(request.status) && (
               <VerifyPaymentForm
                 requestId={request.id}
-                amount={Number(request.totalQuoteUsd ?? 0)}
+                amount={Number(request.finalTotalUsd ?? request.totalQuoteUsd ?? 0)}
                 reference={request.reference}
                 customerReference={request.paymentReference}
               />
