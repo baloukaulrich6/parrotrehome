@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 // Run in its own Bun process: other route unit tests intentionally mock auth.
 import { expect, test } from "bun:test";
-import { cpSync, mkdtempSync, mkdirSync, openSync, closeSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, openSync, readFileSync, closeSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
@@ -44,7 +44,7 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
   class Client {
     cookies = new Map<string, string>();
     async request(route: string, data?: unknown, method = "GET") {
-      const response = await fetch(base + route, { method, headers: { origin: base, cookie: [...this.cookies.values()].join("; "), ...(data === undefined ? {} : { "content-type": data instanceof URLSearchParams ? "application/x-www-form-urlencoded" : "application/json" }) }, body: data === undefined ? undefined : data instanceof URLSearchParams ? data : JSON.stringify(data), redirect: "manual" });
+      const response = await fetch(base + route, { method, headers: { origin: base, cookie: [...this.cookies.values()].join("; "), ...(data === undefined ? {} : { "content-type": data instanceof URLSearchParams ? "application/x-www-form-urlencoded" : "application/json" }) }, body: data === undefined ? undefined : data instanceof URLSearchParams ? data : JSON.stringify(data), redirect: "manual", signal: AbortSignal.timeout(90000) });
       for (const cookie of response.headers.getSetCookie()) { const pair = cookie.split(";")[0]; this.cookies.set(pair.split("=")[0], pair); }
       return response;
     }
@@ -264,7 +264,11 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     expect((await (await login("client@example.com", password)).session()).user).toBeUndefined();
     const changedClient = await login("client@example.com", newPassword);
     expect((await changedClient.request("/account")).status).toBe(200);
+  } catch (error) {
+    console.error("Isolated Next server log (last 40 lines):\n" + readFileSync(path.join(temporary, "next.log"), "utf8").split("\n").slice(-40).join("\n"));
+    throw error;
   } finally {
     await stop(); await db.$disconnect(); closeSync(log); rmSync(temporary, { recursive: true, force: true });
   }
-}, 180000);
+// Cold Next.js compilation on a small VPS can exceed three minutes.
+}, 600000);

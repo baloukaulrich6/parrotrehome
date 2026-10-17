@@ -79,3 +79,10 @@ Le build précède l’arrêt de l’application. Si l’initialisation échoue,
 Les deux images Docker ont été construites. Les 15 tests unitaires/de bootstrap, le test HTTP isolé (39 assertions) et le test Python de migration passent, y compris dans l’image. La configuration Compose et celle de Caddy ont été validées. Un volume temporaire a servi à initialiser puis relancer la base : un seul administrateur est conservé et les zones de livraison ne sont pas dupliquées. Dans le conteneur applicatif non-root, l’API SQLite, la page d’accueil et une vraie connexion administrateur avec accès à `/admin` répondent correctement. La persistance des images a été contrôlée après redémarrage.
 
 Ces tests n’ont exposé aucun port ni déployé l’application sur le VPS. L’installation APT sur votre machine, son DNS, l’émission du certificat public et le parcours complet du script sur votre VPS restent à exécuter. Dans l’environnement cloud de test, le build a utilisé le proxy fourni et son certificat de confiance via un secret BuildKit temporaire ; aucune vérification TLS n’a été désactivée et ce certificat n’est pas inclus dans l’image finale.
+
+
+### Build timeout during the HTTP integration test
+
+The isolated integration test compiles Next.js routes on demand and restarts its test server. On a busy VPS, its former three-minute deadline could expire near the final assertions. It now allows ten minutes, keeps all assertions and bounds individual authenticated requests to ninety seconds. Actual request failures print the isolated server log for diagnosis.
+
+Docker copies only the required source/configuration directories, excludes an accidental nested `parrotrehome/` clone and runs Bun tests using explicit `./tests/...` paths. A nested clone must never contribute old tests or application files to the build. Pull the corrected deployment branch and rerun the normal deployment command; do not reset the database, delete volumes or disable tests. A failed image build does not advance to the database migration or app replacement steps.

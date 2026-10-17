@@ -19,3 +19,6 @@ deploy/secrets
 **/.codex
 **/__pycache__
 **/*.pyc
+
+# Accidental second clone created from inside the checkout.
+/parrotrehome

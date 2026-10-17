@@ -9,7 +9,14 @@ COPY package.json bun.lock ./
 RUN --mount=type=secret,id=build_ca \
     if [ -f /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
     bun install --frozen-lockfile
-COPY . .
+# Explicit inputs keep accidental nested clones and local files out of the image.
+COPY src ./src
+COPY prisma ./prisma
+COPY public ./public
+COPY scripts ./scripts
+COPY tests ./tests
+COPY deploy ./deploy
+COPY next.config.ts tsconfig.json postcss.config.mjs tailwind.config.ts components.json eslint.config.mjs ./
 # Disposable build database; no runtime secrets or client data enter the image.
 ENV DATABASE_URL=file:/tmp/parrotrehome-build.db NEXTAUTH_URL=http://localhost:3000 MAIL_TRANSPORT=preview NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=secret,id=build_ca \
@@ -17,11 +24,11 @@ RUN --mount=type=secret,id=build_ca \
     bun run db:generate \
     && python3 -c 'import sqlite3; c=sqlite3.connect("/tmp/parrotrehome-build.db"); c.execute("PRAGMA user_version=0"); c.close()' \
     && bun x prisma db push --skip-generate \
-    && bun test tests/visit-tracking.test.ts tests/cookie-consent.test.ts tests/bird-age.test.ts tests/demo-workflow.test.ts tests/image-upload.test.ts tests/deployment-bootstrap.test.ts tests/session-policy.test.ts tests/email-transport.test.ts tests/email-signatures.test.ts \
+    && bun test ./tests/visit-tracking.test.ts ./tests/cookie-consent.test.ts ./tests/bird-age.test.ts ./tests/demo-workflow.test.ts ./tests/image-upload.test.ts ./tests/deployment-bootstrap.test.ts ./tests/session-policy.test.ts ./tests/email-transport.test.ts ./tests/email-signatures.test.ts \
     && python3 tests/test_audit_migration.py \
     && python3 tests/test_visit_migration.py \
-    && bun test tests/email-inbox.test.ts \
-    && bun test tests/auth-integration.test.ts \
+    && bun test ./tests/email-inbox.test.ts \
+    && bun test ./tests/auth-integration.test.ts \
     && bun run build \
     && rm -f /tmp/parrotrehome-build.db
 
