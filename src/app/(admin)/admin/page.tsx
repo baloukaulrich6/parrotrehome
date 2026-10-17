@@ -1,3 +1,5 @@
+import { SiteVisitors } from "@/components/admin/site-visitors";
+import { can } from "@/lib/rbac";
 import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -139,6 +141,8 @@ export default async function AdminDashboardPage() {
           View all requests <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </div>
+
+      {can(user.role, "metrics:view") && <SiteVisitors />}
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

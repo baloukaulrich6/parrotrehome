@@ -256,6 +256,10 @@ If configured, Google Analytics and Google Ads tags are loaded only after you al
 
 Use **Cookie preferences** in the footer to accept or refuse optional tracking. Your choice is stored for six months. You can change it sooner; withdrawing permission stops future site tracking events and reloads the page to stop previously initialized tags. The site also honors a browser Global Privacy Control signal by declining optional tracking. Removing accessible optional cookies is best effort; your browser can clear remaining cookies and local storage.
 
+## Site Visitor Statistics
+
+With optional tracking permission, the site records a pseudonymous browser identifier and visit source category to count browsers that remain on visible pages for more than five seconds. Time can accumulate across public pages; background tabs do not add time. Sources distinguish Google search, Google Ads, external links, other tagged campaigns and direct/unknown visits. A browser counts once per reporting period. Referrer blocking, different devices, cleared storage and refused consent limit accuracy; these are estimates, not identified people. We retain visit records for up to 90 days (older records are removed when new visits are recorded). The browser identifier expires after 90 days. We do not store IP addresses, full referring URLs or search terms in these visit records. Refusing tracking prevents this measurement. This measurement is separate from Google tags.
+
 ## More Information
 
 See our [Privacy Policy](/cms/privacy), or contact {{supportEmail}}.`,

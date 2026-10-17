@@ -633,3 +633,15 @@ model PendingAction {
   @@index([actionType])
   @@index([proposedById])
 }
+
+// Anonymous, consented public-site visits. No IP, email or full referrer retained.
+model SiteVisit {
+  id           String    @id
+  visitorKey   String
+  source       String
+  startedAt    DateTime
+  qualifiedAt  DateTime?
+
+  @@index([qualifiedAt, visitorKey])
+  @@index([startedAt])
+}

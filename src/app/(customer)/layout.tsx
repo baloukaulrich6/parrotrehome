@@ -1,3 +1,4 @@
+import { SiteVisitTracker } from "@/components/site-visit-tracker";
 import { readSiteSettings } from "@/lib/site-settings";
 import { ParrotRehomeHeader } from "@/components/parrotrehome/header";
 import { ParrotRehomeFooter } from "@/components/parrotrehome/footer";
@@ -19,6 +20,7 @@ export default function CustomerLayout({
   const settings = readSiteSettings();
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SiteVisitTracker />
       <ParrotRehomeHeader settings={settings} />
       <main className="flex-1">{children}</main>
       <ParrotRehomeFooter settings={settings} />
