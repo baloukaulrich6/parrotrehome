@@ -4,8 +4,8 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { MAX_IMAGE_BYTES, parsePhotos } from "@/lib/photo-data";
 
-export function ImageUpload({ value, onChange, onBusyChange }: {
-  value: string; onChange: (value: string) => void; onBusyChange: (busy: boolean) => void;
+export function ImageUpload({ value, onChange, onBusyChange, endpoint = "/api/admin/uploads" }: {
+  value: string; endpoint?: string; onChange: (value: string) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const id = useId();
   const [busy, setBusy] = useState(false);
@@ -18,15 +18,15 @@ export function ImageUpload({ value, onChange, onBusyChange }: {
     try {
       for (const file of Array.from(files)) {
         if (file.size > MAX_IMAGE_BYTES) throw new Error("Images must be at most 5 MB.");
-        const res = await fetch("/api/admin/uploads", {
+        const res = await fetch(endpoint, {
           method: "POST", headers: { "Content-Type": file.type }, body: file,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Upload failed");
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || (res.status === 429 ? "Upload limit reached. Please try again later." : "Upload failed"));
         uploaded.push(data.url);
         onChange(JSON.stringify(uploaded));
       }
-      toast.success("Photos uploaded. Save the form to publish them in the catalog.");
+      toast.success(endpoint === "/api/admin/uploads" ? "Photos uploaded. Save the form to publish them in the catalog." : "Photos uploaded. Submit your listing for review.");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Upload failed"); }
     finally { setBusy(false); onBusyChange(false); }
   }

@@ -1,3 +1,4 @@
+import { publicBirdWhere } from "@/lib/public-birds";
 import { publicContent } from "@/lib/public-content";
 import { createHash } from "node:crypto";
 import { requiredPurchasePolicies } from "@/lib/policy-content";
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
     const birdIds = data.items.filter((i) => i.type === "BIRD").map((i) => i.refId);
     if (birdIds.length > 0) {
       const birds = await db.bird.findMany({
-        where: { id: { in: birdIds } },
+        where: { id: { in: birdIds }, AND: publicBirdWhere },
       });
       for (const b of birds) {
         if (b.status !== "AVAILABLE") {
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
     const serverItems: { type: string; refId: string; name: string; qty: number; priceUsd: number; birdId?: string | null; productId?: string | null }[] = [];
     for (const item of data.items) {
       if (item.type === "BIRD") {
-        const bird = await db.bird.findUnique({ where: { id: item.refId }, select: { priceUsd: true, commonName: true, status: true } });
+        const bird = await db.bird.findFirst({ where: { id: item.refId, AND: publicBirdWhere }, select: { priceUsd: true, commonName: true, status: true } });
         if (!bird) {
           return NextResponse.json({ error: `Bird not found for ID ${item.refId}` }, { status: 400 });
         }
@@ -212,14 +213,15 @@ export async function POST(req: Request) {
 
       // Lock each bird to this request (T-02)
       for (const bid of birdIds) {
-        await tx.bird.update({
-          where: { id: bid },
+        const reserved = await tx.bird.updateMany({
+          where: { id: bid, status: "AVAILABLE", reservedByRequestId: null, AND: publicBirdWhere },
           data: {
             status: "RESERVED",
             reservedByRequestId: r.id,
             reservedUntil: new Date(Date.now() + 1000 * 60 * 60 * 48),
           },
         });
+        if (reserved.count !== 1) throw new Error("BIRD_RESERVATION_CONFLICT");
       }
 
       // A-23: increment coupon usage count if a coupon was applied (server-verified)
@@ -288,6 +290,7 @@ export async function POST(req: Request) {
       emailStatus: delivery.status,
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "BIRD_RESERVATION_CONFLICT") return NextResponse.json({ error: "This bird is no longer available. Please refresh your request." }, { status: 409 });
     console.error("[requests] POST error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to submit request" },

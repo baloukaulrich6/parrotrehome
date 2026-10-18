@@ -1,3 +1,4 @@
+import { publicBirdWhere } from "@/lib/public-birds";
 import { formatBirdAge } from "@/lib/bird-age";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
@@ -26,7 +27,7 @@ export default async function ParrotsPage({
 }) {
   const sp = await searchParams;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { AND: publicBirdWhere };
   if (sp.species) where.species = { contains: sp.species };
   if (sp.status) where.status = sp.status;
   if (sp.location) where.location = { contains: sp.location };
@@ -50,6 +51,7 @@ export default async function ParrotsPage({
 
   const birds = await db.bird.findMany({ where, orderBy });
   const allSpecies = await db.bird.findMany({
+    where: publicBirdWhere,
     select: { species: true, commonName: true },
     distinct: ["species"],
   });

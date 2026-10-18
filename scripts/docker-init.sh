@@ -14,6 +14,7 @@ source.close()
 PY
   python3 scripts/migrate-audit-log.py /data/app.db
   python3 scripts/migrate-site-visits.py /data/app.db
+  python3 scripts/migrate-seller-accounts.py /data/app.db
   # Existing schema changes require a reviewed migration, never data-loss flags.
   bun x prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
 else

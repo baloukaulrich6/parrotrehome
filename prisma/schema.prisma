@@ -132,6 +132,11 @@ model User {
   updatedAt     DateTime        @updatedAt
   lastLoginAt   DateTime?
 
+  accountPreference AccountPreference?
+  sellerListings SellerListing[]
+  sellerUploads SellerUpload[]
+  accountNotifications AccountNotification[]
+
   // Relations
   requests              Request[]           @relation("RequestCustomer")
   assignedRequests      Request[]           @relation("RequestAgent")
@@ -190,6 +195,7 @@ model Bird {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  sellerListing SellerListing?
   requestItems    RequestItem[]
 
   @@index([species])
@@ -644,4 +650,63 @@ model SiteVisit {
 
   @@index([qualifiedAt, visitorKey])
   @@index([startedAt])
+}
+
+model AccountPreference {
+  userId String @id
+  intent String @default("BUY")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SellerListing {
+  id String @id @default(cuid())
+  sellerId String
+  title String
+  species String
+  ageYears Float?
+  priceUsd Float
+  location String
+  description String
+  photos String
+  contactName String
+  contactPhone String
+  contactAddress String
+  payoutMethod String
+  payoutRecipient String
+  status String @default("PENDING")
+  reviewNote String?
+  reviewedById String?
+  reviewedAt DateTime?
+  birdId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  bird Bird? @relation(fields: [birdId], references: [id], onDelete: Restrict)
+  @@index([sellerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SellerUpload {
+  id String @id @default(cuid())
+  userId String
+  url String @unique
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+
+model AccountNotification {
+  id String @id @default(cuid())
+  eventKey String @unique
+  userId String
+  kind String
+  toAddress String
+  subject String
+  body String
+  status String @default("PENDING")
+  errorMessage String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([kind, createdAt])
 }

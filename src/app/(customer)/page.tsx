@@ -1,3 +1,4 @@
+import { publicBirdWhere } from "@/lib/public-birds";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import Image from "next/image";
@@ -29,7 +30,7 @@ const HERO_IMAGE =
 export default async function HomePage() {
   // Pull featured birds (first 4 available) so the page is alive
   const featured = await db.bird.findMany({
-    where: { status: "AVAILABLE" },
+    where: { status: "AVAILABLE", AND: publicBirdWhere },
     take: 4,
     orderBy: { createdAt: "desc" },
   });

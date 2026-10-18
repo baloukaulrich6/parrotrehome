@@ -1,3 +1,4 @@
+import { AccountAlert } from "@/components/admin/account-alert";
 import { requireStaffPage } from "@/lib/staff-page";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -13,7 +14,7 @@ export default async function AdminCustomersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireStaffPage();
+  const staff = await requireStaffPage();
   const sp = await searchParams;
   const where = { role: "CLIENT" as const };
   // SQLite doesn't support typed where with OR on enum filter; use raw where
@@ -31,6 +32,7 @@ export default async function AdminCustomersPage({
           ],
         }
       : where,
+    include: { accountPreference: true, accountNotifications: { where: { kind: "SECURITY_ALERT" }, select: { id: true, status: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -73,7 +75,9 @@ export default async function AdminCustomersPage({
                 <th className="text-left px-4 py-3 font-semibold">Consent</th>
                 <th className="text-left px-4 py-3 font-semibold">Joined</th>
                 <th className="text-right px-4 py-3 font-semibold">Requests</th>
+                <th className="text-left px-4 py-3 font-semibold">Purpose</th>
                 <th className="text-left px-4 py-3 font-semibold">Status</th>
+                {staff.role === "SUPER_ADMIN" && <th className="text-left px-4 py-3 font-semibold">Security advice</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-feather/10">
@@ -91,10 +95,12 @@ export default async function AdminCustomersPage({
                   <td className="px-4 py-3 text-right text-slate font-semibold">
                     {countMap.get(u.id) ?? 0}
                   </td>
+                  <td className="px-4 py-3">{u.accountPreference?.intent || "BUY"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block h-2 w-2 rounded-full ${u.status === "ACTIVE" ? "bg-forest" : "bg-tail-red"}`} />
                     <span className="ml-2 text-slate text-[12px]">{u.status.replace(/_/g, " ").toLowerCase()}</span>
                   </td>
+                  {staff.role === "SUPER_ADMIN" && <td className="px-4 py-3"><AccountAlert userId={u.id} existing={u.accountNotifications[0]} /></td>}
                 </tr>
               ))}
             </tbody>

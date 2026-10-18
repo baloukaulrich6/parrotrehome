@@ -22,6 +22,7 @@ import { useFavoritesCount } from "@/components/parrotrehome/favorite-toggle";
 
 const NAV = [
   { href: "/parrots", label: "Parrots" },
+  { href: "/sell", label: "Sell a parrot" },
   { href: "/supplies", label: "Cages & Supplies" },
   { href: "/avian-advice", label: "Avian Advice" },
   { href: "/about", label: "Our Promise" },

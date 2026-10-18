@@ -1,3 +1,4 @@
+import { publicBirdWhere } from "@/lib/public-birds";
 import Link from "next/link";
 import Image from "next/image";
 import { db } from "@/lib/db";
@@ -19,6 +20,7 @@ export default async function SearchPage({
   const birds = q
     ? await db.bird.findMany({
         where: {
+          AND: publicBirdWhere,
           OR: [
             { commonName: { contains: q } },
             { species: { contains: q } },

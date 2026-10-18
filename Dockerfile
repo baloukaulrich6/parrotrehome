@@ -27,6 +27,7 @@ RUN --mount=type=secret,id=build_ca \
     && bun test ./tests/visit-tracking.test.ts ./tests/cookie-consent.test.ts ./tests/bird-age.test.ts ./tests/demo-workflow.test.ts ./tests/image-upload.test.ts ./tests/deployment-bootstrap.test.ts ./tests/session-policy.test.ts ./tests/email-transport.test.ts ./tests/email-signatures.test.ts \
     && python3 tests/test_audit_migration.py \
     && python3 tests/test_visit_migration.py \
+    && python3 tests/test_seller_migration.py \
     && bun test ./tests/email-inbox.test.ts \
     && bun test ./tests/auth-integration.test.ts \
     && bun run build \

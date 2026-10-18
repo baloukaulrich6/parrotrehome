@@ -1,5 +1,5 @@
 // Default public content; existing CMS overrides are preserved.
-export const POLICY_VERSION = "2026-10-16";
+export const POLICY_VERSION = "2026-10-18";
 export const requiredPurchasePolicies = ["terms", "payment", "refunds", "delivery", "privacy"] as const;
 export const contentPages: Record<string, { title: string; body: string }> = {
   "about": {
@@ -264,4 +264,27 @@ With optional tracking permission, the site records a pseudonymous browser ident
 
 See our [Privacy Policy](/cms/privacy), or contact {{supportEmail}}.`,
   }
+};
+
+contentPages.sellers = {
+  title: "Seller listings, verification and payouts",
+  body: `## Before Submitting
+
+You must be at least 18, have lawful authority to sell the individual bird, and have permission to use every submitted photograph. Describe the species, age (estimated where appropriate), known health or behavior concerns, location, availability, asking price and available documentation accurately. Do not list protected wildlife or any animal whose sale or transport would be unlawful. Staff may request relevant ownership and permit information through a confirmed support channel.
+
+## Verification and Publication
+
+Your listing remains pending until an authorized reviewer checks the contact information, payout recipient and listing details. Submission, account creation or approval is not a guarantee of sale, veterinary health, identity certification or a promise of payment. Public listings show bird information and city/state; private correspondence address, telephone, account email and payout preference are available only to you and authorized staff. Keep private information out of descriptions and photographs. Approved listings enter the ParrotRehome catalog and purchasing process.
+
+## Seller Payment Arrangements
+
+The payout field describes how ParrotRehome may pay you, not how a buyer should pay you directly. Customers continue to use the payment arrangements confirmed by ParrotRehome. Listing approval does not initiate a transfer. Any commission, deductions, net amount, timing, conditions, documentation and delivery responsibilities must be disclosed and agreed in writing before a sale or transfer is finalized. No commission or payout deadline is invented by this submission form. Do not provide passwords, PINs, card data or banking login credentials. For bank transfer, provide a beneficiary name for initial review; any necessary banking instructions must be arranged securely with verified staff.
+
+## Changes, Withdrawal and Concerns
+
+You can withdraw a listing from your seller area. If an order or reservation is already in progress, contact support so that existing customer rights and commitments can be reviewed first. To replace an inaccurate listing, withdraw it and submit a corrected listing for fresh verification; approval does not authorize later unreviewed edits. Staff may reject inaccurate or unverifiable submissions with a reason. Contact {{supportEmail}} to challenge a decision or report a listing, ownership, safety or payout issue. Mandatory legal rights remain applicable.
+
+## Privacy
+
+We process seller contact details, payout preference and supporting listing information to review submissions, communicate, coordinate a sale and keep appropriate transaction/audit records. We share only the relevant information needed for an agreed transaction and lawful obligations. See the [Privacy Policy](/cms/privacy), [Terms of Service](/cms/terms), [Payment Policy](/cms/payment) and [Delivery Policy](/cms/delivery).`,
 };

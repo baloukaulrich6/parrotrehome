@@ -24,6 +24,7 @@ function SignUpContent() {
   }, [prefillEmail]);
 
   const [form, setForm] = useState({
+    intent: "BUY",
     name: "",
     email: "",
     password: "",
@@ -39,8 +40,8 @@ function SignUpContent() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (form.password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+    if (form.password.length < 12) {
+      toast.error("Password must be at least 12 characters.");
       return;
     }
     if (form.password !== form.confirm) {
@@ -58,6 +59,8 @@ function SignUpContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
+          intent: form.intent,
+          consent: form.consent,
           email: form.email,
           password: form.password,
         }),
@@ -78,7 +81,7 @@ function SignUpContent() {
       }
       toast.success("Welcome to ParrotRehome.");
       trackConversion("sign_up");
-      router.push(callbackUrl);
+      router.push(callbackUrl === "/" && form.intent !== "BUY" ? "/sell" : callbackUrl);
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-up failed");
@@ -101,7 +104,7 @@ function SignUpContent() {
             Track your requests and receive secure payment instructions.
           </p>
 
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="space-y-4"><label className="block text-sm">I want to<select aria-label="Account purpose" value={form.intent} onChange={event => update("intent", event.target.value)} className="w-full mt-1 p-3 rounded border bg-ivory"><option value="BUY">Buy</option><option value="SELL">Sell</option><option value="BOTH">Buy and sell</option></select></label>
             <div>
               <label htmlFor="name" className="text-[12px] font-body font-semibold text-feather uppercase tracking-wide">Full name</label>
               <div className="relative mt-1">
@@ -133,7 +136,7 @@ function SignUpContent() {
             </div>
             <div>
               <label htmlFor="password" className="text-[12px] font-body font-semibold text-feather uppercase tracking-wide">
-                Password <span className="text-feather/60 normal-case font-normal">(min 8 characters)</span>
+                Password <span className="text-feather/60 normal-case font-normal">(12–72 characters)</span>
               </label>
               <div className="relative mt-1">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-feather" aria-hidden />

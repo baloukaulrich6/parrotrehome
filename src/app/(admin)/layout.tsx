@@ -30,6 +30,8 @@ const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/pending-actions", label: "Pending approvals", icon: AlertCircle },
   { href: "/admin/requests", label: "Requests", icon: ClipboardList },
+  { href: "/admin/seller-listings", label: "Seller listings", icon: Bird },
+  { href: "/admin/account-notifications", label: "Account emails", icon: Mail },
   { href: "/admin/birds", label: "Birds", icon: Bird },
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/admin/appointments", label: "Appointments", icon: CalendarClock },
@@ -54,7 +56,7 @@ export default async function AdminLayout({
 }) {
   const user = await requireStaffPage();
 
-  const visibleNav = NAV.filter(item => (item.href !== "/admin/settings" || user.role === "SUPER_ADMIN") && (item.href !== "/admin/inbox" || ["SUPER_ADMIN", "MANAGER"].includes(user.role)));
+  const visibleNav = NAV.filter(item => (!["/admin/settings", "/admin/account-notifications"].includes(item.href) || user.role === "SUPER_ADMIN") && (!["/admin/inbox", "/admin/seller-listings"].includes(item.href) || ["SUPER_ADMIN", "MANAGER"].includes(user.role)));
 
   // Count new requests for the sidebar badge
   const newCount = await db.request.count({

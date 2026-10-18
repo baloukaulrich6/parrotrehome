@@ -1,3 +1,4 @@
+import { publicBirdWhere } from "@/lib/public-birds";
 import { formatBirdAge } from "@/lib/bird-age";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
@@ -35,7 +36,7 @@ export default async function BirdDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const bird = await db.bird.findUnique({ where: { id } });
+  const bird = await db.bird.findFirst({ where: { id, AND: publicBirdWhere } });
   if (!bird) return notFound();
 
   const photos = parsePhotos(bird.photos ?? "");
@@ -48,7 +49,7 @@ export default async function BirdDetailPage({
   const status = BIRD_STATUS_META[bird.status];
   const relatedBirds = await db.bird.findMany({
     where: {
-      AND: [
+      AND: [publicBirdWhere,
         { id: { not: bird.id } },
         { OR: [{ species: bird.species }, { status: "AVAILABLE" }] },
       ],
