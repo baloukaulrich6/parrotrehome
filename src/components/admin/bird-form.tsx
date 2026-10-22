@@ -19,6 +19,7 @@ interface BirdData {
   photos?: string; // JSON string
   status?: BirdStatus;
   location?: string;
+  publicPhone?: string | null;
   priceUsd?: number | string;
   shortDescription?: string;
   longDescription?: string;
@@ -49,6 +50,7 @@ export function BirdFormDialog({
     photos: bird?.photos ?? "",
     status: bird?.status ?? "AVAILABLE",
     location: bird?.location ?? "",
+    publicPhone: bird?.publicPhone ?? "",
     priceUsd: bird?.priceUsd ?? "",
     shortDescription: bird?.shortDescription ?? "",
     longDescription: bird?.longDescription ?? "",
@@ -129,6 +131,7 @@ export function BirdFormDialog({
             <Field label="Individual ID / band" htmlFor="individualId">
               <input id="individualId" type="text" value={form.individualId} onChange={(e) => update("individualId", e.target.value)} placeholder="e.g., AG-2026-001" className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
             </Field>
+            <Field label="Public seller / adoption contact (WhatsApp, optional)" htmlFor="publicPhone"><input id="publicPhone" type="tel" maxLength={60} value={form.publicPhone} onChange={event => update("publicPhone", event.target.value)} placeholder="+1 503 555 0123" className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory" /><p className="text-xs text-feather mt-1">Use a WhatsApp-enabled number with its country code. This number will be visible to customers and will open the contact's WhatsApp. Confirm the owner's permission before publishing it.</p></Field>
             <Field label="Age (approximate if not documented)" htmlFor="bird-age-value">
               <div className="flex gap-2"><input id="bird-age-value" type="number" step="any" min="0" value={age.value} onChange={event => setAge({ ...age, value: event.target.value })} className="w-full h-10 px-3 rounded-md border border-feather/30 bg-ivory" /><select aria-label="Age unit" value={age.unit} onChange={event => setAge({ ...age, unit: event.target.value as AgeUnit })} className="h-10 rounded-md border bg-ivory px-2"><option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option></select></div>
             </Field>

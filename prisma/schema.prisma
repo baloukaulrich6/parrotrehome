@@ -195,6 +195,7 @@ model Bird {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  publicPhone String?
   sellerListing SellerListing?
   requestItems    RequestItem[]
 
@@ -680,6 +681,7 @@ model SellerListing {
   birdId String? @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  publicPhone String?
   seller User @relation(fields: [sellerId], references: [id], onDelete: Restrict)
   bird Bird? @relation(fields: [birdId], references: [id], onDelete: Restrict)
   @@index([sellerId, createdAt])

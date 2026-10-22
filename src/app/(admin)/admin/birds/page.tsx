@@ -138,6 +138,7 @@ export default async function AdminBirdsPage({
                               photos: b.photos,
                               status: b.status,
                               location: b.location ?? undefined,
+                              publicPhone: b.publicPhone,
                               priceUsd: b.priceUsd ?? undefined,
                               shortDescription: b.shortDescription ?? undefined,
                               longDescription: b.longDescription ?? undefined,

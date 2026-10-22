@@ -1,5 +1,5 @@
 // Default public content; existing CMS overrides are preserved.
-export const POLICY_VERSION = "2026-10-18";
+export const POLICY_VERSION = "2026-10-22";
 export const requiredPurchasePolicies = ["terms", "payment", "refunds", "delivery", "privacy"] as const;
 export const contentPages: Record<string, { title: string; body: string }> = {
   "about": {
@@ -274,7 +274,7 @@ You must be at least 18, have lawful authority to sell the individual bird, and 
 
 ## Verification and Publication
 
-Your listing remains pending until an authorized reviewer checks the contact information, payout recipient and listing details. Submission, account creation or approval is not a guarantee of sale, veterinary health, identity certification or a promise of payment. Public listings show bird information and city/state; private correspondence address, telephone, account email and payout preference are available only to you and authorized staff. Keep private information out of descriptions and photographs. Approved listings enter the ParrotRehome catalog and purchasing process.
+Your listing remains pending until an authorized reviewer checks the contact information, payout recipient and listing details. Submission, account creation or approval is not a guarantee of sale, veterinary health, identity certification or a promise of payment. Public listings show bird information and city/state. If you explicitly provide an optional public WhatsApp number, that number is also shown and linked to WhatsApp. Your private verification telephone is not automatically published. Private correspondence address, verification telephone, account email and payout preference are available only to you and authorized staff. Keep private information out of descriptions and photographs. Approved listings enter the ParrotRehome catalog and purchasing process.
 
 ## Seller Payment Arrangements
 

@@ -1,5 +1,7 @@
+import { publicPhoneSchema } from "./public-phone-schema";
 import { z } from "zod";
 export const listingSchema = z.object({
+  publicPhone: publicPhoneSchema,
   title: z.string().trim().min(2).max(120), species: z.string().trim().min(2).max(120),
   ageYears: z.number().min(0).max(150).nullable(), priceUsd: z.number().positive().max(1000000),
   location: z.string().trim().min(3).max(200), description: z.string().trim().min(30).max(5000),

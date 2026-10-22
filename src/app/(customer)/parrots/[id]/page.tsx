@@ -1,3 +1,4 @@
+import { whatsAppUrl } from "@/lib/whatsapp";
 import { publicBirdWhere } from "@/lib/public-birds";
 import { formatBirdAge } from "@/lib/bird-age";
 export const dynamic = "force-dynamic";
@@ -115,6 +116,7 @@ export default async function BirdDetailPage({
                 </div>
               )}
 
+              {bird.publicPhone && whatsAppUrl(bird.publicPhone) && <section className="rounded-xl border border-forest/20 bg-forest/5 p-5 mb-6 space-y-2"><h2 className="font-heading text-xl">Contact the seller / adoption contact</h2><p className="text-sm">WhatsApp: <a href={whatsAppUrl(bird.publicPhone)!} target="_blank" rel="noopener noreferrer" className="font-semibold underline">{bird.publicPhone}</a></p><a href={whatsAppUrl(bird.publicPhone)!} target="_blank" rel="noopener noreferrer" className="inline-flex rounded-full bg-forest px-5 py-3 text-white font-semibold">Contact on WhatsApp</a></section>}
               {/* CTAs */}
               <div className="flex items-center gap-3">
                 <div className="flex-1">

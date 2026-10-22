@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!changed.count) return { status: 409 };
     let birdId: string | null = null;
     if (decision.decision === "APPROVE") {
-      const bird = await tx.bird.create({ data: { species: listing.species, commonName: listing.title, ageYears: listing.ageYears, priceUsd: listing.priceUsd, location: listing.location, shortDescription: listing.description.slice(0, 200), longDescription: listing.description, photos: listing.photos, status: "AVAILABLE" } });
+      const bird = await tx.bird.create({ data: { publicPhone: listing.publicPhone, species: listing.species, commonName: listing.title, ageYears: listing.ageYears, priceUsd: listing.priceUsd, location: listing.location, shortDescription: listing.description.slice(0, 200), longDescription: listing.description, photos: listing.photos, status: "AVAILABLE" } });
       birdId = bird.id;
       await tx.sellerListing.update({ where: { id }, data: { birdId } });
     }

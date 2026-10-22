@@ -1,3 +1,4 @@
+import { publicPhoneSchema } from "@/lib/public-phone-schema";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -7,6 +8,7 @@ import { photosSchema } from "@/lib/photo-schema";
 import { z } from "zod";
 
 const schema = z.object({
+  publicPhone: publicPhoneSchema,
   species: z.string().optional(),
   commonName: z.string().min(2, "Common name is required"),
   individualId: z.string().optional(),
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
     const d = parsed.data;
     const bird = await db.bird.create({
       data: {
+        publicPhone: d.publicPhone,
         species: d.species ?? "Unknown",
         commonName: d.commonName,
         individualId: d.individualId || null,

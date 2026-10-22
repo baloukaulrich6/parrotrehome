@@ -1,3 +1,4 @@
+import { publicPhoneSchema } from "@/lib/public-phone-schema";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { z } from "zod";
 // PUT /api/admin/birds/[id] — A-13 CRUD update
 
 const schema = z.object({
+  publicPhone: publicPhoneSchema,
   species: z.string().optional(),
   commonName: z.string().min(2),
   individualId: z.string().optional(),
@@ -45,6 +47,7 @@ export async function PUT(
     const bird = await db.bird.update({
       where: { id },
       data: {
+        publicPhone: d.publicPhone,
         species: d.species ?? "Unknown",
         commonName: d.commonName,
         individualId: d.individualId || null,

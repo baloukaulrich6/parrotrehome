@@ -11,7 +11,15 @@ TABLES = ['AccountPreference', 'SellerListing', 'SellerUpload', 'AccountNotifica
 SQL_PATH = pathlib.Path(__file__).parent / 'migrations' / 'seller-accounts.sql'
 
 def shape(con, table):
-    return con.execute(f'PRAGMA table_info("{table}")').fetchall(), con.execute(f'PRAGMA foreign_key_list("{table}")').fetchall()
+    columns = con.execute(f'PRAGMA table_info("{table}")').fetchall()
+    # A later, additive migration adds an optional public contact. Keep this
+    # earlier migration repeatable without permitting arbitrary schema drift.
+    if table == 'SellerListing':
+        for column in columns:
+            if column[1] == 'publicPhone' and column[2:] != ('TEXT', 0, None, 0):
+                raise ValueError('Unexpected publicPhone schema')
+        columns = [column for column in columns if column[1] != 'publicPhone']
+    return columns, con.execute(f'PRAGMA foreign_key_list("{table}")').fetchall()
 
 def migrate(database):
     database = pathlib.Path(database)
