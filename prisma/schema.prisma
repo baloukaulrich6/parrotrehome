@@ -231,6 +231,7 @@ model Product {
 // -------------------- 4. Requests --------------------
 
 model Request {
+  paymentReceipts PaymentReceipt[]
   id              String         @id @default(cuid())
   reference       String         @unique  // human-friendly: REQ-XXXX
   type            RequestType
@@ -344,6 +345,7 @@ model PaymentInstruction {
 // -------------------- 7. Payment Checks (A-08, T-06) --------------------
 
 model PaymentCheck {
+  receipt PaymentReceipt?
   id          String    @id @default(cuid())
   requestId   String
   reference   String?   // customer-supplied reference (F-26)
@@ -711,4 +713,19 @@ model AccountNotification {
   updatedAt DateTime @updatedAt
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([kind, createdAt])
+}
+
+model PaymentReceipt {
+  id String @id
+  paymentCheckId String @unique
+  requestId String
+  snapshot String
+  filename String
+  pdfBase64 String
+  deliveryState String @default("PENDING")
+  errorMessage String?
+  createdAt DateTime @default(now())
+  paymentCheck PaymentCheck @relation(fields: [paymentCheckId], references: [id], onDelete: Restrict)
+  request Request @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  @@index([requestId])
 }

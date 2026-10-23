@@ -1,4 +1,5 @@
-import { sendRequestNotification } from "@/lib/email";
+import { prepareReceipt, sendReceipt, validateReceivedAmount } from "@/lib/payment-receipts";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -31,6 +32,7 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (req.headers.get("origin") !== new URL(process.env.NEXTAUTH_URL || req.url).origin) return new Response(null, { status: 403 });
     const { id } = await params;
     const body = await req.json();
     const parsed = schema.safeParse(body);
@@ -43,6 +45,15 @@ export async function POST(
 
     let request = await db.request.findUnique({ where: { id } });
     if (!request) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    try { validateReceivedAmount(request.finalTotalUsd ?? request.totalQuoteUsd, parsed.data.amount); } catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
+    parsed.data.reference = parsed.data.reference || request.paymentReference?.trim() || undefined;
+    if (!parsed.data.reference) return NextResponse.json({ error: "Enter the verified provider payment reference." }, { status: 400 });
+    // Validate issuer details and prepare the document before changing payment state.
+    const checkId = randomUUID(); const verifiedAt = new Date();
+    let receiptData;
+    try { receiptData = await prepareReceipt(id, { id: checkId, amount: parsed.data.amount, reference: parsed.data.reference, verifiedAt }); }
+    catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
 
     // An authorized staff member can record a reference received by email.
     if (request.status === "INSTRUCTIONS_SENT") {
@@ -64,6 +75,8 @@ export async function POST(
     // For amounts >= $1000, defer to PendingAction for 2-person approval.
     const HIGH_VALUE_THRESHOLD = 1000;
     if (parsed.data.amount >= HIGH_VALUE_THRESHOLD) {
+      const existing = await db.pendingAction.findFirst({ where: { requestId: id, actionType: "PAYMENT_VERIFY_HIGH_VALUE", status: "PENDING", expiresAt: { gt: new Date() } } });
+      if (existing) return NextResponse.json({ error: "This payment is already awaiting second approval." }, { status: 409 });
       const action = await db.pendingAction.create({
         data: {
           requestId: id,
@@ -111,10 +124,11 @@ export async function POST(
 
     // Transaction: payment check + status update + audit
     await db.$transaction(async (tx) => {
-      const changed = await tx.request.updateMany({ where: { id, status: "PAYMENT_TO_VERIFY" }, data: { status: newStatus, paidAt: new Date() } });
+      const changed = await tx.request.updateMany({ where: { id, status: "PAYMENT_TO_VERIFY" }, data: { status: newStatus, paidAt: verifiedAt } });
       if (!changed.count) throw new Error("Request changed. Refresh before verifying payment.");
       await tx.paymentCheck.create({
         data: {
+          id: checkId, verifiedAt,
           requestId: id,
           reference: parsed.data.reference,
           amount: parsed.data.amount,
@@ -122,8 +136,7 @@ export async function POST(
           notes: parsed.data.notes,
         },
       });
-
-
+      await tx.paymentReceipt.create({ data: receiptData });
     });
 
     await auditLog.paymentVerify(
@@ -142,9 +155,8 @@ export async function POST(
       { verifiedAmount: parsed.data.amount }
     );
 
-    await sendRequestNotification(id, "payment-verified", "", `payment-verified:${id}`);
-
-    return NextResponse.json({ ok: true, status: newStatus });
+    const delivery = await sendReceipt(id).catch(() => ({ receiptId: receiptData.id, status: "FAILED" }));
+    return NextResponse.json({ ok: true, status: newStatus, receiptId: delivery.receiptId, emailStatus: delivery.status });
   } catch (err) {
     console.error("[verify] error:", err);
     return NextResponse.json(

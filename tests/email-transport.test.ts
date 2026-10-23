@@ -28,11 +28,12 @@ test("Resend receives authenticated HTML and text with reply-to and stable idemp
     const data = JSON.parse(init?.body as string);
     expect(data.reply_to).toBe("support@parrotrehome.com");
     expect(data.to).toEqual([payload.toAddress]);
+    expect(data.attachments).toEqual([{ filename: "receipt.pdf", content: "JVBERi0=" }]);
     expect(data.text).toBe(payload.body); expect(data.html).toContain("#F7F6F1");
     return Response.json({ id: "provider-message-id" });
   }) as unknown as typeof fetch;
-  expect(await deliverEmail(payload, "same-event")).toBe("SENT");
-  expect(await deliverEmail(payload, "same-event")).toBe("SENT");
+  expect(await deliverEmail({ ...payload, attachments: [{ filename: "receipt.pdf", content: "JVBERi0=" }] }, "same-event")).toBe("SENT");
+  expect(await deliverEmail({ ...payload, attachments: [{ filename: "receipt.pdf", content: "JVBERi0=" }] }, "same-event")).toBe("SENT");
   expect(keys[0]).toBe(keys[1]); expect(keys[0]).toMatch(/^[0-9a-f]{64}$/);
 });
 test("missing key and provider rejection cannot be reported as sent", async () => {

@@ -16,7 +16,7 @@ export function mailConfiguration() {
 export function customerReplyAddress(type: "request" | "inbox", id: string) {
   return mailConfiguration().inboundProvider === "resend" ? replyAddress(type, id) : undefined;
 }
-export async function deliverEmail(payload: { toAddress: string; subject: string; body: string; html?: string; replyTo?: string }, key: string): Promise<"QUEUED" | "SENT"> {
+export async function deliverEmail(payload: { toAddress: string; subject: string; body: string; html?: string; replyTo?: string; attachments?: { filename: string; content: string }[] }, key: string): Promise<"QUEUED" | "SENT"> {
   const config = mailConfiguration();
   if (config.transport === "preview") return "QUEUED";
   if (config.transport !== "resend") throw new Error("Unsupported mail transport.");
@@ -26,7 +26,7 @@ export async function deliverEmail(payload: { toAddress: string; subject: string
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": createHash("sha256").update(key).digest("hex") },
-    body: JSON.stringify({ from: `ParrotRehome <${config.from}>`, to: [payload.toAddress], reply_to: replyTo, subject: payload.subject, text: payload.body, html: payload.html || renderEmailHtml(payload.subject, payload.body, process.env.NEXTAUTH_URL) }),
+    body: JSON.stringify({ from: `ParrotRehome <${config.from}>`, to: [payload.toAddress], reply_to: replyTo, subject: payload.subject, text: payload.body, attachments: payload.attachments, html: payload.html || renderEmailHtml(payload.subject, payload.body, process.env.NEXTAUTH_URL) }),
     signal: AbortSignal.timeout(15000),
   });
   const result = await response.json().catch(() => null);

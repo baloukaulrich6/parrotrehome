@@ -170,6 +170,16 @@ export function VerifyPaymentForm({
 }) {
   const router = useRouter();
   const [confirmationReference, setConfirmationReference] = useState(customerReference || "");
+  const [previewing, setPreviewing] = useState(false);
+  async function previewReceipt() {
+    setPreviewing(true);
+    try {
+      const response = await fetch(`/api/admin/requests/${requestId}/receipt`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "preview", amount: Number(verifiedAmount), reference: confirmationReference.trim() }) });
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || "Preview unavailable");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a"); link.href = url; link.download = `draft-receipt-${reference}.pdf`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Preview failed"); } finally { setPreviewing(false); }
+  }
   const [verifiedAmount, setVerifiedAmount] = useState(amount.toFixed(2));
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -188,7 +198,7 @@ export function VerifyPaymentForm({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      toast.success(data.status === "PENDING_APPROVAL" ? "Payment submitted for second approval; not yet confirmed." : "Payment verified — audit trail updated.");
+      toast.success(data.status === "PENDING_APPROVAL" ? "Payment submitted for second approval; not yet confirmed." : data.emailStatus === "SENT" ? "Payment verified — receipt accepted by the email provider." : data.emailStatus === "QUEUED" ? "Payment verified — receipt saved in preview; no email was sent." : "Payment verified — receipt email needs retry. See the receipt panel.");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -231,8 +241,10 @@ export function VerifyPaymentForm({
         className="mt-2 w-full h-9 rounded-md bg-forest hover:bg-forest-dark text-white text-[13px] font-body font-semibold inline-flex items-center justify-center gap-2 disabled:bg-feather/40"
       >
         {submitting ? <Clock className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-        Mark as Paid - verified
+        Confirm payment and email PDF receipt
       </button>
+      <button type="button" disabled={previewing || submitting || !confirmationReference.trim()} onClick={previewReceipt} className="mt-2 w-full rounded border p-2 text-sm">{previewing ? "Preparing preview…" : "Preview draft PDF receipt"}</button>
+      <p className="text-xs text-feather mt-2">The final PDF is generated only after payment verification. Payments of $1,000 or more need second approval before the receipt email is sent.</p>
       <p className="text-[11px] text-tail-red font-body mt-2">
         ⚠️ T-06: This requires manual verification through the official provider. Never mark paid based solely on a customer&apos;s claim.
       </p>

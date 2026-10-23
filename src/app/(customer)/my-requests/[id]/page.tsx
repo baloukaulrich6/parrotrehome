@@ -414,6 +414,7 @@ export default async function RequestDetailPage({
               <FileText className="h-4 w-4" aria-hidden /> Download recap (PDF)
             </a>
 
+            {request.paymentChecks.length > 0 && <a className="block rounded-xl border bg-white p-5 underline text-forest" href={`/api/requests/${request.id}/receipt`}>Download your payment receipt (PDF)</a>}
             <section className="bg-white border rounded-xl p-5 space-y-3"><h2 className="font-heading text-lg">Cancellation or refund help</h2><p className="text-sm text-feather">Use the cancellation action for an eligible pending request. If you have paid or need a refund, contact support with this reference. Canceling here does not automatically transfer money.</p><a className="text-forest underline text-sm" href={`mailto:${mailConfiguration().replyTo}?subject=${encodeURIComponent(`Refund request — ${request.reference}`)}`}>Request cancellation or refund by email</a><PolicyLinks /></section>
 
             {/* Customer-side cancel within policy (F-27 + Cahier p.07) */}

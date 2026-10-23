@@ -10,6 +10,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["pdfkit"],
+  outputFileTracingIncludes: { "/*": ["./node_modules/pdfkit/js/data/**/*"] },
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -1,4 +1,5 @@
-import { sendRequestNotification } from "@/lib/email";
+import { prepareReceipt, sendReceipt } from "@/lib/payment-receipts";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerUser } from "@/lib/auth";
@@ -21,6 +22,7 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (_req.headers.get("origin") !== new URL(process.env.NEXTAUTH_URL || _req.url).origin) return new Response(null, { status: 403 });
     const { id } = await params;
     const action = await db.pendingAction.findUnique({ where: { id } });
     if (!action) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -38,21 +40,13 @@ export async function POST(
       );
     }
 
-    // Mark approved
-    await db.pendingAction.update({
-      where: { id },
-      data: {
-        status: "APPROVED",
-        approverId: user.id,
-        approverName: user.name ?? user.email,
-        approvedAt: new Date(),
-      },
-    });
+    if (action.expiresAt <= new Date()) return NextResponse.json({ error: "This approval has expired." }, { status: 409 });
 
     // Execute the actual action
     const changes = JSON.parse(action.proposedChanges) as Record<string, unknown>;
 
     if (action.actionType === "PAYMENT_VERIFY_HIGH_VALUE") {
+      if (!can(user.role, "payment:validate")) return new Response(null, { status: 403 });
       // Execute the payment verification
       const requestId = action.requestId ?? (changes.requestId as string);
       if (!requestId) return NextResponse.json({ error: "Missing requestId" }, { status: 400 });
@@ -70,27 +64,26 @@ export async function POST(
         return NextResponse.json({ error: "Invalid transition" }, { status: 400 });
       }
 
-      await db.$transaction(async (tx) => {
-        await tx.paymentCheck.create({
-          data: {
-            requestId,
-            reference: (changes.reference as string) ?? null,
-            amount: changes.amount as number,
-            verifiedBy: user.id,
-            notes: (changes.notes as string) ?? `Approved via 2-person rule by ${user.name}`,
-          },
-        });
-        await tx.request.update({
-          where: { id: requestId },
-          data: { status: newStatus, paidAt: new Date() },
-        });
+      const checkId = randomUUID(); const verifiedAt = new Date();
+      if (typeof changes.amount !== "number" || typeof changes.reference !== "string" || !changes.reference.trim()) return NextResponse.json({ error: "Invalid payment confirmation." }, { status: 400 });
+      let receiptData;
+      try { receiptData = await prepareReceipt(requestId, { id: checkId, amount: changes.amount, reference: changes.reference, verifiedAt }); }
+      catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
+      await db.$transaction(async tx => {
+        const claimed = await tx.pendingAction.updateMany({ where: { id, status: "PENDING", expiresAt: { gt: new Date() } }, data: { status: "APPROVED", approverId: user.id, approverName: user.name ?? user.email, approvedAt: verifiedAt } });
+        if (!claimed.count) throw new Error("Approval changed. Refresh before retrying.");
+        const changed = await tx.request.updateMany({ where: { id: requestId, status: "PAYMENT_TO_VERIFY" }, data: { status: newStatus, paidAt: verifiedAt } });
+        if (!changed.count) throw new Error("Payment state changed. Refresh before retrying.");
+        await tx.paymentCheck.create({ data: { id: checkId, requestId, reference: changes.reference as string, amount: changes.amount as number, verifiedBy: user.id, verifiedAt, notes: (changes.notes as string) ?? `Approved via 2-person rule by ${user.name}` } });
+        await tx.paymentReceipt.create({ data: receiptData });
       });
-
-      await sendRequestNotification(requestId, "payment-verified", "", `payment-verified:${requestId}`);
+      await sendReceipt(requestId).catch(error => console.error("[receipt] payment verified, delivery needs retry", error));
 
       await auditLog.paymentVerify(user.id, user.role, requestId, changes.reference as string, changes.amount as number);
       await auditLog.requestStatusChange(user.id, user.role, requestId, request.status, newStatus, { approvedVia: action.id });
     }
+
+    if (action.actionType !== "PAYMENT_VERIFY_HIGH_VALUE") await db.pendingAction.update({ where: { id }, data: { status: "APPROVED", approverId: user.id, approverName: user.name ?? user.email, approvedAt: new Date() } });
 
     await audit({
       actorId: user.id,

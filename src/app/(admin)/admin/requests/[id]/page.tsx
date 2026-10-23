@@ -1,3 +1,4 @@
+import { PaymentReceiptPanel } from "@/components/admin/payment-receipt-panel";
 import { mailConfiguration } from "@/lib/email-transport";
 import { requireStaffPage } from "@/lib/staff-page";
 import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
@@ -60,6 +61,7 @@ export default async function DossierPage({
       appointments: { include: { professional: true } },
       messages: { orderBy: { sentAt: "asc" } },
       paymentInstructions: { orderBy: { createdAt: "desc" } },
+      paymentReceipts: { orderBy: { createdAt: "desc" }, take: 1 },
       paymentChecks: { orderBy: { verifiedAt: "desc" }, include: { verifier: true } },
       comments: { orderBy: { createdAt: "asc" }, include: { user: true } },
       selectedPaymentMethod: true,
@@ -455,6 +457,7 @@ export default async function DossierPage({
           </div>
 
           {/* Verification log */}
+          {canVerify && request.paymentChecks.length > 0 && ["PAID_VERIFIED", "READY_FOR_FULFILLMENT", "COMPLETED"].includes(request.status) && <PaymentReceiptPanel requestId={request.id} status={request.paymentReceipts[0]?.deliveryState} error={request.paymentReceipts[0]?.errorMessage} />}
           {request.paymentChecks.length > 0 && (
             <div className="bg-white rounded-xl border border-feather/20 p-5">
               <h3 className="font-heading text-slate text-[14px] font-semibold mb-3 flex items-center gap-1">
