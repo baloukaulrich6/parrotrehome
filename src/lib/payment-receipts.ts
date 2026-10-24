@@ -14,11 +14,10 @@ export async function prepareReceipt(requestId: string, check: { id: string; amo
   validateReceivedAmount(request.finalTotalUsd ?? request.totalQuoteUsd, check.amount);
   if (!check.reference.trim()) throw new Error("Enter the provider payment confirmation reference.");
   const company = readSiteSettings();
-  if (company.address === defaultSiteSettings.address) throw new Error("Configure your real company address in Configuration before issuing a payment receipt.");
   const snapshot: ReceiptSnapshot = {
     number: draft ? `DRAFT-${request.reference}` : `RCPT-${request.reference}-${check.id.slice(-8).toUpperCase()}`,
     order: request.reference, issuedAt: new Date().toISOString(), paymentAt: check.verifiedAt.toISOString(), paymentReference: check.reference,
-    company: { name: company.name, address: company.address, email: company.email, phone: company.phone === defaultSiteSettings.phone ? "Contact us by email" : company.phone },
+    company: { name: company.name, address: company.address.trim() === defaultSiteSettings.address.trim() ? "" : company.address, email: company.email, phone: company.phone === defaultSiteSettings.phone ? "Contact us by email" : company.phone },
     customer: { name: request.customerName, email: request.customerEmail, phone: request.customerPhone || "", address: request.shippingAddress || "", state: request.shippingState || "" },
     items: request.items.map(item => ({ name: item.bird?.commonName || item.product?.name || "Avian service", quantity: item.quantity, unit: item.quotedPriceUsd })),
     subtotal: request.totalQuoteUsd ?? check.amount, discount: request.discountUsd ?? 0, total: request.finalTotalUsd ?? request.totalQuoteUsd ?? check.amount, received: check.amount, method: request.selectedPaymentMethod?.name || "As agreed in order",

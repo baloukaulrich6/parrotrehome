@@ -345,6 +345,8 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     expect((await client.request(`/api/requests/${createdOrder.requestId}/receipt`)).status).toBe(404);
     expect((await client.request(`/api/admin/requests/${createdOrder.requestId}/receipt`, { action: "preview", amount: 900, reference: "BANK-REF" }, "POST")).status).toBe(403);
     expect((await admin.request(`/api/admin/requests/${createdOrder.requestId}/verify`, { amount: 1, reference: "WRONG-AMOUNT" }, "POST")).status).toBe(400);
+    // A legacy/default company address must not block confirmation or preview.
+    expect((await admin.request("/api/admin/site-settings", { ...settings, address: defaultSiteSettings.address }, "PUT")).status).toBe(200);
     const draftReceipt = await admin.request(`/api/admin/requests/${createdOrder.requestId}/receipt`, { action: "preview", amount: 900, reference: "BANK-REF" }, "POST");
     expect(draftReceipt.status).toBe(200); expect(draftReceipt.headers.get("content-type")).toBe("application/pdf"); expect(Buffer.from(await draftReceipt.arrayBuffer()).subarray(0, 5).toString()).toBe("%PDF-");
     expect(await db.paymentReceipt.count({ where: { requestId: createdOrder.requestId } })).toBe(0);
@@ -352,6 +354,9 @@ test("password-only sign-in, legacy accounts, staff management and activity hist
     expect((await db.request.findUniqueOrThrow({ where: { id: createdOrder.requestId } })).status).toBe("PAID_VERIFIED");
     const issuedReceipt = await db.paymentReceipt.findFirstOrThrow({ where: { requestId: createdOrder.requestId } });
     expect(issuedReceipt.deliveryState).toBe("QUEUED");
+    expect(JSON.parse(issuedReceipt.snapshot).company.address).toBe("");
+    expect(issuedReceipt.snapshot).not.toContain(defaultSiteSettings.address);
+    expect((await admin.request("/api/admin/site-settings", settings, "PUT")).status).toBe(200);
     expect(issuedReceipt.snapshot).toContain("Order Bird"); expect(issuedReceipt.snapshot).toContain("EMAIL-CONFIRMATION-900"); expect(issuedReceipt.snapshot).not.toContain("Internal bank check note");
     const paidEmail = await db.message.findFirstOrThrow({ where: { requestId: createdOrder.requestId, template: "payment-verified" } });
     expect(paidEmail.body).toContain("PDF is attached"); expect(paidEmail.body).toContain("Order Bird"); expect(paidEmail.body).toContain("900.00");

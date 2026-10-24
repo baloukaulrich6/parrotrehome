@@ -23,7 +23,7 @@ export function renderReceiptPdf(data: ReceiptSnapshot, draft = false): Promise<
       doc.fontSize(15).fillColor("#424B50").text(draft ? "DRAFT — NOT PROOF OF PAYMENT" : "PAYMENT RECEIPT", 115, 79);
       doc.x = 45; doc.y = 115; doc.font("ReceiptBody").fontSize(10).fillColor("#424B50");
       const paragraph = (label: string, text: string) => { doc.font("ReceiptBold").text(label); doc.font("ReceiptBody").text(clean(text), { width: 505 }); doc.moveDown(0.65); };
-      paragraph("Issuer", `${data.company.address}\n${data.company.email} | ${data.company.phone}`.replace(/\n/g, " / "));
+      paragraph("Issuer", [data.company.address, data.company.email, data.company.phone].filter(Boolean).join(" / "));
       paragraph("Receipt / order", `${data.number} / ${data.order}`);
       paragraph("Dates (UTC+1)", `Issued: ${localDate(data.issuedAt)} | Payment verified: ${localDate(data.paymentAt)}`);
       paragraph("Customer", `${data.customer.name} / ${data.customer.email} / ${data.customer.phone} / ${data.customer.address}, ${data.customer.state}`);
