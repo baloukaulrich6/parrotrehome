@@ -1,3 +1,4 @@
+import { fulfillmentLabel } from "@/lib/fulfillment";
 import { PolicyLinks } from "@/components/parrotrehome/policy-links";
 import { mailConfiguration } from "@/lib/email-transport";
 import { LiveRequestRefresh } from "@/components/parrotrehome/live-request-refresh";
@@ -250,6 +251,8 @@ export default async function RequestDetailPage({
                   <div>
                     <dt className="text-feather text-[12px] uppercase font-semibold tracking-wide">Phone</dt>
                     <dd className="text-slate">{request.customerPhone ?? "—"}</dd>
+                    <dt className="text-feather text-[11px] uppercase font-semibold tracking-wide mt-2">Delivery / pickup</dt>
+                    <dd className="text-slate">{fulfillmentLabel(request.fulfillmentMethod)}</dd>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">

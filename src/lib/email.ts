@@ -1,3 +1,4 @@
+import { fulfillmentLabel } from "@/lib/fulfillment";
 import { deliverEmail, mailConfiguration, customerReplyAddress } from "./email-transport";
 import { resolveEmailTemplate } from "./email-templates";
 import { db } from "@/lib/db";
@@ -418,6 +419,7 @@ ORDER
 ${items}
 Estimated total: $${(request.finalTotalUsd ?? request.totalQuoteUsd ?? 0).toFixed(2)} USD
 Payment preference: ${request.selectedPaymentMethod?.name || "Not selected"}
+Fulfillment: ${fulfillmentLabel(request.fulfillmentMethod)}
 
 PLACEMENT INFORMATION
 Experience: ${request.experience || "Not provided"}

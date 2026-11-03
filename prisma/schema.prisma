@@ -243,6 +243,7 @@ model Request {
   customerEmail   String
   customerPhone   String?
   shippingState   String         // US state — must be in served states list
+  fulfillmentMethod String? // DELIVERY or PICKUP; null for historical requests
   shippingAddress String?
   experience      String?        // "Beginner" / "Intermediate" / "Expert"
   habitat         String?        // cage / aviary description

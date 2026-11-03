@@ -1,3 +1,4 @@
+import { fulfillmentLabel } from "@/lib/fulfillment";
 import { publicBirdWhere } from "@/lib/public-birds";
 import { publicContent } from "@/lib/public-content";
 import { createHash } from "node:crypto";
@@ -24,6 +25,7 @@ const schema = z.object({
   customerEmail: z.string().email(),
   customerPhone: z.string().optional(),
   paymentMethodId: z.string().min(1).optional(),
+  fulfillmentMethod: z.enum(["DELIVERY", "PICKUP"]).optional(),
   shippingState: z.string().min(2),
   shippingAddress: z.string().optional(),
   experience: z.enum(["Beginner", "Intermediate", "Expert"]).optional(),
@@ -185,6 +187,7 @@ export async function POST(req: Request) {
           customerName: data.customerName,
           customerEmail: data.customerEmail,
           customerPhone: data.customerPhone,
+          fulfillmentMethod: data.fulfillmentMethod ?? null,
           shippingState: data.shippingState,
           shippingAddress: data.shippingAddress,
           experience: data.experience,
@@ -261,7 +264,7 @@ export async function POST(req: Request) {
       itemsSummary,
       totalQuote: finalTotalUsd ?? totalQuote,
       paymentMethodName: selectedMethod?.name,
-      customerDetails: `Name: ${data.customerName}\nEmail: ${data.customerEmail}\nPhone: ${data.customerPhone || "Not provided"}\nAddress: ${data.shippingAddress || "Not provided"}\nState: ${data.shippingState}\nExperience: ${data.experience || "Not provided"}\nHabitat: ${data.habitat || "Not provided"}\nPreferences: ${data.preferences || "None"}`,
+      customerDetails: `Fulfillment: ${fulfillmentLabel(data.fulfillmentMethod)}\nName: ${data.customerName}\nEmail: ${data.customerEmail}\nPhone: ${data.customerPhone || "Not provided"}\nAddress: ${data.shippingAddress || "Not provided"}\nState: ${data.shippingState}\nExperience: ${data.experience || "Not provided"}\nHabitat: ${data.habitat || "Not provided"}\nPreferences: ${data.preferences || "None"}`,
       nextSteps,
     });
     emailPayload.requestId = request.id;

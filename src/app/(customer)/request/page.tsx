@@ -53,6 +53,7 @@ export default function RequestPage() {
     customerName: session?.user?.name ?? "",
     customerEmail: session?.user?.email ?? "",
     customerPhone: "",
+    fulfillmentMethod: "",
     shippingState: "",
     shippingAddress: "",
     experience: "Beginner",
@@ -192,7 +193,7 @@ export default function RequestPage() {
                 </Field>
                 <div>
                   <label htmlFor="shippingState" className="text-[12px] font-body font-semibold text-feather uppercase tracking-wide">
-                    Shipping state *
+                    Your state *
                   </label>
                   <select
                     id="shippingState"
@@ -208,8 +209,18 @@ export default function RequestPage() {
                   </select>
                 </div>
               </div>
+              <fieldset className="mt-4 space-y-2">
+                <legend className="font-semibold text-slate">Delivery or pickup *</legend>
+                {[{ value: "DELIVERY", label: "Have my order delivered" }, { value: "PICKUP", label: "Collect my animal at the breeder / trainer" }].map(option => (
+                  <label key={option.value} className="flex gap-3 items-center rounded-lg border border-feather/30 p-3">
+                    <input type="radio" name="fulfillmentMethod" required value={option.value} checked={form.fulfillmentMethod === option.value} onChange={() => update("fulfillmentMethod", option.value)} />
+                    {option.label}
+                  </label>
+                ))}
+                <p className="text-sm text-feather">{form.fulfillmentMethod === "PICKUP" ? "We will confirm the pickup location and appointment with the breeder or trainer. Do not travel before confirmation. For multiple birds, collection locations may differ." : "Delivery availability, costs and estimated timing will be confirmed before payment."}</p>
+              </fieldset>
               <div className="mt-3">
-                <Field label="Shipping address (optional)" icon={MapPin} htmlFor="shippingAddress">
+                <Field label="Address (optional)" icon={MapPin} htmlFor="shippingAddress">
                   <input id="shippingAddress" type="text" value={form.shippingAddress} onChange={(e) => update("shippingAddress", e.target.value)} placeholder="Street, city, ZIP" className="w-full h-10 pl-9 pr-3 rounded-md border border-feather/30 bg-ivory text-[14px] focus-ring" />
                 </Field>
               </div>
